@@ -1,9 +1,21 @@
 const express = require('express');
 const router = express.Router();
-const { createBooking } = require('../controllers/booking.controller');
-const { verifyToken, verifyCustomer } = require('../middlewares/auth.middleware');
+const {
+  createBooking,
+  getMyRentals,
+  getOwnerRentals,
+  updateBookingStatus
+} = require('../controllers/booking.controller');
+const { verifyToken, verifyCustomer, verifyOwner } = require('../middlewares/auth.middleware');
 
-// customer create booking
+// customer routes
 router.post('/', verifyToken, verifyCustomer, createBooking);
+router.get('/my-rentals', verifyToken, verifyCustomer, getMyRentals);
+
+// owner rental orders route
+router.get('/owner-rentals', verifyToken, verifyOwner, getOwnerRentals);
+
+// update booking status route (Owner or Admin)
+router.patch('/:id/status', verifyToken, updateBookingStatus);
 
 module.exports = router;

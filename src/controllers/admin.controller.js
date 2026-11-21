@@ -113,8 +113,32 @@ const deleteAdminEquipment = async (req, res) => {
   }
 };
 
+// get all rental bookings for admin monitoring (Admin Dashboard)
+const getAllRentals = async (req, res) => {
+  try {
+    const { bookingsCollection } = getCollections();
+    const rentals = await bookingsCollection
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.status(200).json({
+      success: true,
+      totalCount: rentals.length,
+      data: rentals
+    });
+  } catch (error) {
+    console.error('getAllRentals error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch all rentals for admin'
+    });
+  }
+};
+
 module.exports = {
   getAdminEquipment,
   updateEquipmentStatus,
-  deleteAdminEquipment
+  deleteAdminEquipment,
+  getAllRentals
 };

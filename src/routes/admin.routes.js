@@ -3,7 +3,8 @@ const router = express.Router();
 const {
   getAdminEquipment,
   updateEquipmentStatus,
-  deleteAdminEquipment
+  deleteAdminEquipment,
+  getAllRentals
 } = require('../controllers/admin.controller');
 const { verifyToken, verifyAdmin } = require('../middlewares/auth.middleware');
 
@@ -14,5 +15,8 @@ router.use(verifyToken, verifyAdmin);
 router.get('/equipment', getAdminEquipment);
 router.patch('/equipment/:id/status', updateEquipmentStatus);
 router.delete('/equipment/:id', deleteAdminEquipment);
+
+// admin all rentals overview route
+router.get('/rentals', getAllRentals);
 
 module.exports = router;
