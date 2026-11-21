@@ -17,10 +17,24 @@ const client = new MongoClient(uri, {
 
 let db;
 
+// create indexes for fast search and filtering
+const setupIndexes = async (database) => {
+  try {
+    const equipmentCol = database.collection('equipment');
+    await equipmentCol.createIndex({ name: 'text', location: 'text' });
+    await equipmentCol.createIndex({ category: 1 });
+    await equipmentCol.createIndex({ status: 1 });
+    await equipmentCol.createIndex({ rentalPrice: 1 });
+  } catch (err) {
+    // ignore if index already exists
+  }
+};
+
 const connectDB = async () => {
   try {
     await client.connect();
     db = client.db(process.env.DB_NAME || 'equiphub_db');
+    await setupIndexes(db);
     console.log('Successfully connected to MongoDB!');
   } catch (error) {
     console.error('MongoDB connection error:', error.message);
