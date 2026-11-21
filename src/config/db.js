@@ -57,7 +57,9 @@ const getCollections = () => {
     equipmentCollection: database.collection('equipment'),
     bookingsCollection: database.collection('bookings'),
     favoritesCollection: database.collection('favorites'),
-    paymentsCollection: database.collection('payments')
+    paymentsCollection: database.collection('payments'),
+    reviewsCollection: database.collection('reviews'),
+    settingsCollection: database.collection('settings')
   };
 };
 
