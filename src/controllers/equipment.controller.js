@@ -2,6 +2,130 @@ const { ObjectId } = require('mongodb');
 const { getCollections } = require('../config/db');
 const { validateEquipment, createEquipmentObject } = require('../models/equipment.model');
 
+// get all public approved equipment with search, filter, and sort (Challenge 1)
+const getAllPublicEquipment = async (req, res) => {
+  try {
+    const {
+      search,
+      category,
+      rentalType,
+      minPrice,
+      maxPrice,
+      available,
+      sortBy,
+      page,
+      limit
+    } = req.query;
+
+    const { equipmentCollection } = getCollections();
+
+    // base query: only approved equipment
+    const query = { status: 'Approved' };
+
+    // search by name or location
+    if (search && search.trim()) {
+      query.$or = [
+        { name: { $regex: search.trim(), $options: 'i' } },
+        { location: { $regex: search.trim(), $options: 'i' } }
+      ];
+    }
+
+    // category filter
+    if (category && category !== 'All' && category !== '') {
+      query.category = category;
+    }
+
+    // rental type filter (Daily, Weekly, Monthly)
+    if (rentalType && rentalType !== 'All' && rentalType !== '') {
+      query.rentalType = rentalType;
+    }
+
+    // availability filter
+    if (available === 'true') {
+      query.availableQuantity = { $gt: 0 };
+    }
+
+    // price range filter
+    if (minPrice || maxPrice) {
+      query.rentalPrice = {};
+      if (minPrice) query.rentalPrice.$gte = Number(minPrice);
+      if (maxPrice) query.rentalPrice.$lte = Number(maxPrice);
+    }
+
+    // sorting options
+    let sortOptions = { createdAt: -1 }; // default recently added
+    if (sortBy === 'price_asc') {
+      sortOptions = { rentalPrice: 1 };
+    } else if (sortBy === 'price_desc') {
+      sortOptions = { rentalPrice: -1 };
+    } else if (sortBy === 'recent') {
+      sortOptions = { createdAt: -1 };
+    }
+
+    // pagination and limits (e.g. limit=6 for home page)
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 12;
+    const skip = (pageNum - 1) * limitNum;
+
+    const totalCount = await equipmentCollection.countDocuments(query);
+    const equipment = await equipmentCollection
+      .find(query)
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limitNum)
+      .toArray();
+
+    res.status(200).json({
+      success: true,
+      totalCount,
+      currentPage: pageNum,
+      totalPages: Math.ceil(totalCount / limitNum),
+      data: equipment
+    });
+  } catch (error) {
+    console.error('getAllPublicEquipment error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch equipment list'
+    });
+  }
+};
+
+// get single equipment details by ID
+const getEquipmentById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid equipment ID format'
+      });
+    }
+
+    const { equipmentCollection } = getCollections();
+    const equipment = await equipmentCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!equipment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Equipment not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: equipment
+    });
+  } catch (error) {
+    console.error('getEquipmentById error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch equipment details'
+    });
+  }
+};
+
 // create new equipment (Owner only)
 const createEquipment = async (req, res) => {
   try {
@@ -171,6 +295,8 @@ const deleteEquipment = async (req, res) => {
 };
 
 module.exports = {
+  getAllPublicEquipment,
+  getEquipmentById,
   createEquipment,
   getMyEquipment,
   updateEquipment,
