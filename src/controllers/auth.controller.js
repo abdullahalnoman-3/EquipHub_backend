@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { getCollections } = require('../config/db');
 const { createUserObject } = require('../models/user.model');
+const { generateToken, cookieOptions } = require('../utils/jwt');
 
 // register new user
 const registerUser = async (req, res) => {
@@ -58,11 +59,19 @@ const registerUser = async (req, res) => {
 
     const result = await usersCollection.insertOne(newUser);
 
-    res.status(201).json({
+    // generate token
+    const token = generateToken({
+      id: result.insertedId,
+      email: newUser.email,
+      role: newUser.role
+    });
+
+    res.cookie('token', token, cookieOptions).status(201).json({
       success: true,
       message: 'User registered successfully',
-      data: {
-        userId: result.insertedId,
+      token,
+      user: {
+        id: result.insertedId,
         name: newUser.name,
         email: newUser.email,
         role: newUser.role,
@@ -78,6 +87,147 @@ const registerUser = async (req, res) => {
   }
 };
 
+// login user with email and password
+const loginUser = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and password are required'
+      });
+    }
+
+    const { usersCollection } = getCollections();
+
+    // find user
+    const user = await usersCollection.findOne({
+      email: email.toLowerCase().trim()
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    // compare password
+    const isPasswordMatch = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordMatch) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid email or password'
+      });
+    }
+
+    // generate token
+    const token = generateToken({
+      id: user._id,
+      email: user.email,
+      role: user.role
+    });
+
+    res.cookie('token', token, cookieOptions).status(200).json({
+      success: true,
+      message: 'Login successful',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        photoURL: user.photoURL || ''
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during login'
+    });
+  }
+};
+
+// google social login
+const socialLogin = async (req, res) => {
+  try {
+    const { name, email, photoURL } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required for social login'
+      });
+    }
+
+    const { usersCollection } = getCollections();
+    const formattedEmail = email.toLowerCase().trim();
+
+    let user = await usersCollection.findOne({ email: formattedEmail });
+
+    // if user does not exist, create new user with default role Customer
+    if (!user) {
+      const newUser = createUserObject({
+        name: name || 'User',
+        email: formattedEmail,
+        photoURL: photoURL || '',
+        role: 'Customer'
+      });
+
+      const result = await usersCollection.insertOne(newUser);
+      user = { ...newUser, _id: result.insertedId };
+    }
+
+    // generate token
+    const token = generateToken({
+      id: user._id,
+      email: user.email,
+      role: user.role
+    });
+
+    res.cookie('token', token, cookieOptions).status(200).json({
+      success: true,
+      message: 'Social login successful',
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        photoURL: user.photoURL || ''
+      }
+    });
+  } catch (error) {
+    console.error('Social login error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during social login'
+    });
+  }
+};
+
+// logout user
+const logoutUser = async (req, res) => {
+  try {
+    res.clearCookie('token', cookieOptions).status(200).json({
+      success: true,
+      message: 'Logged out successfully'
+    });
+  } catch (error) {
+    console.error('Logout error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to logout'
+    });
+  }
+};
+
 module.exports = {
-  registerUser
+  registerUser,
+  loginUser,
+  socialLogin,
+  logoutUser
 };
