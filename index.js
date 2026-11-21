@@ -6,6 +6,7 @@ const { connectDB } = require('./src/config/db');
 
 // import routes
 const authRoutes = require('./src/routes/auth.routes');
+const userRoutes = require('./src/routes/user.routes');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -20,6 +21,7 @@ app.use(cookieParser());
 
 // application routes
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', userRoutes);
 
 // root route
 app.get('/', (req, res) => {
