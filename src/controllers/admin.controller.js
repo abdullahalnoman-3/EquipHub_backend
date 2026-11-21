@@ -1,5 +1,6 @@
 const { ObjectId } = require('mongodb');
 const { getCollections } = require('../config/db');
+const { sendEquipmentStatusToOwner } = require('../services/email.service');
 
 // get all equipment for admin moderation (Pending, Approved, Rejected)
 const getAdminEquipment = async (req, res) => {
@@ -53,15 +54,24 @@ const updateEquipmentStatus = async (req, res) => {
     }
 
     const { equipmentCollection } = getCollections();
-    const result = await equipmentCollection.updateOne(
+    const equipment = await equipmentCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!equipment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Equipment not found'
+      });
+    }
+
+    await equipmentCollection.updateOne(
       { _id: new ObjectId(id) },
       { $set: { status, updatedAt: new Date() } }
     );
 
-    if (result.matchedCount === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Equipment not found'
+    // trigger email alert to owner in background
+    if (equipment.owner?.email) {
+      sendEquipmentStatusToOwner(equipment, status).catch(err => {
+        console.log('Owner email notice:', err.message);
       });
     }
 

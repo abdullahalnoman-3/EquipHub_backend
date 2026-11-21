@@ -10,6 +10,10 @@ const {
   getAllReviewsAdmin,
   updateReviewStatusAdmin
 } = require('../controllers/review.controller');
+const {
+  getSMTPSettings,
+  updateSMTPSettings
+} = require('../controllers/setting.controller');
 const { verifyToken, verifyAdmin } = require('../middlewares/auth.middleware');
 
 // protect all admin routes with verifyToken and verifyAdmin
@@ -26,5 +30,9 @@ router.get('/rentals', getAllRentals);
 // admin review moderation routes
 router.get('/reviews', getAllReviewsAdmin);
 router.patch('/reviews/:id/status', updateReviewStatusAdmin);
+
+// admin SMTP configuration routes
+router.get('/smtp', getSMTPSettings);
+router.patch('/smtp', updateSMTPSettings);
 
 module.exports = router;

@@ -1,6 +1,10 @@
 const { ObjectId } = require('mongodb');
 const { getCollections } = require('../config/db');
 const { createBookingObject, createPaymentObject } = require('../models/booking.model');
+const {
+  sendBookingConfirmationToCustomer,
+  sendRentalAlertToOwner
+} = require('../services/email.service');
 
 // create new booking after successful stripe payment
 const createBooking = async (req, res) => {
@@ -84,6 +88,14 @@ const createBooking = async (req, res) => {
       { _id: new ObjectId(equipmentId) },
       { $inc: { availableQuantity: -requestedQty } }
     );
+
+    // trigger automated email notifications in background
+    sendBookingConfirmationToCustomer(bookingData).catch(err => {
+      console.log('Customer notification notice:', err.message);
+    });
+    sendRentalAlertToOwner(bookingData).catch(err => {
+      console.log('Owner notification notice:', err.message);
+    });
 
     res.status(201).json({
       success: true,
