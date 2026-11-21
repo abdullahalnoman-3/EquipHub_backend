@@ -8,6 +8,7 @@ const { connectDB } = require('./src/config/db');
 const authRoutes = require('./src/routes/auth.routes');
 const userRoutes = require('./src/routes/user.routes');
 const equipmentRoutes = require('./src/routes/equipment.routes');
+const adminRoutes = require('./src/routes/admin.routes');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -24,6 +25,7 @@ app.use(cookieParser());
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/equipment', equipmentRoutes);
+app.use('/api/v1/admin', adminRoutes);
 
 // root route
 app.get('/', (req, res) => {
