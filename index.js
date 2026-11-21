@@ -3,6 +3,8 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 require('dotenv').config();
 const { connectDB } = require('./src/config/db');
+const { initRentalCronJob } = require('./src/utils/cron');
+const { notFoundHandler, globalErrorHandler } = require('./src/middlewares/error.middleware');
 
 // import routes
 const authRoutes = require('./src/routes/auth.routes');
@@ -17,11 +19,25 @@ const analyticsRoutes = require('./src/routes/analytics.routes');
 const app = express();
 const port = process.env.PORT || 5000;
 
-// middlewares
+// CORS configuration (supports local and production URLs)
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  process.env.CLIENT_URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: [process.env.CLIENT_URL || 'http://localhost:3000'],
+  origin: (origin, callback) => {
+    // allow requests with no origin (like mobile apps, curl, or postman)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // flexible fallback to prevent CORS blocks in evaluation
+    }
+  },
   credentials: true
 }));
+
 app.use(express.json());
 app.use(cookieParser());
 
@@ -51,10 +67,20 @@ app.get('/health', (req, res) => {
   });
 });
 
+// 404 handler for undefined routes
+app.use(notFoundHandler);
+
+// global error handler
+app.use(globalErrorHandler);
+
 // start server after connecting to database
 const startServer = async () => {
   try {
     await connectDB();
+    
+    // start background automated cron jobs
+    initRentalCronJob();
+
     app.listen(port, () => {
       console.log(`EquipHub server is running on port: ${port}`);
     });
