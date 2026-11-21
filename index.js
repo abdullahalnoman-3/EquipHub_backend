@@ -11,6 +11,7 @@ const equipmentRoutes = require('./src/routes/equipment.routes');
 const adminRoutes = require('./src/routes/admin.routes');
 const favoriteRoutes = require('./src/routes/favorite.routes');
 const paymentRoutes = require('./src/routes/payment.routes');
+const bookingRoutes = require('./src/routes/booking.routes');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -30,6 +31,7 @@ app.use('/api/v1/equipment', equipmentRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/favorites', favoriteRoutes);
 app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/bookings', bookingRoutes);
 
 // root route
 app.get('/', (req, res) => {
