@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 require('dotenv').config();
+const { connectDB } = require('./src/config/db');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -30,7 +31,16 @@ app.get('/health', (req, res) => {
   });
 });
 
-// start the server
-app.listen(port, () => {
-  console.log(`EquipHub server is running on port: ${port}`);
-});
+// start server after connecting to database
+const startServer = async () => {
+  try {
+    await connectDB();
+    app.listen(port, () => {
+      console.log(`EquipHub server is running on port: ${port}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+  }
+};
+
+startServer();
