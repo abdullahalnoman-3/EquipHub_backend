@@ -2,7 +2,11 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+
+// Ensure .env is explicitly resolved from application root directory
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
 require('dotenv').config();
+
 const { connectDB } = require('./src/config/db');
 const { initRentalCronJob } = require('./src/utils/cron');
 const { notFoundHandler, globalErrorHandler } = require('./src/middlewares/error.middleware');

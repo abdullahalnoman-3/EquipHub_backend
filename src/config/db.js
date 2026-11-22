@@ -1,19 +1,34 @@
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const dns = require('dns');
+const path = require('path');
+
+// Ensure .env is resolved correctly regardless of process working directory (cPanel / Passenger)
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 require('dotenv').config();
 
-// fix for windows dns resolution with mongodb srv records
-dns.setServers(['8.8.8.8', '1.1.1.1']);
+// fix for windows & cloud dns resolution with mongodb srv records
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch (dnsErr) {
+  // ignore in non-privileged environments
+}
 
-const uri = process.env.DB_URI;
+const uri = process.env.DB_URI || (
+  process.env.DB_USER && process.env.DB_PASS
+    ? `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.2ssk8l9.mongodb.net/${process.env.DB_NAME || 'equiphub_db'}?retryWrites=true&w=majority`
+    : ''
+);
 
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  }
-});
+let client = null;
+if (uri) {
+  client = new MongoClient(uri, {
+    serverApi: {
+      version: ServerApiVersion.v1,
+      strict: true,
+      deprecationErrors: true,
+    }
+  });
+}
 
 let db;
 
@@ -32,6 +47,20 @@ const setupIndexes = async (database) => {
 
 const connectDB = async () => {
   try {
+    if (!uri) {
+      throw new Error('MongoDB DB_URI is not defined. Please configure DB_URI in your .env file or cPanel environment variables.');
+    }
+
+    if (!client) {
+      client = new MongoClient(uri, {
+        serverApi: {
+          version: ServerApiVersion.v1,
+          strict: true,
+          deprecationErrors: true,
+        }
+      });
+    }
+
     await client.connect();
     db = client.db(process.env.DB_NAME || 'equiphub_db');
     await setupIndexes(db);
