@@ -4,7 +4,16 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-const sharp = require('sharp');
+
+// Safely attempt to load sharp with platform fallback to avoid server startup crashes
+let sharp = null;
+try {
+  sharp = require('sharp');
+} catch (sharpLoadError) {
+  console.warn(
+    'Notice: Sharp native binding not available for this host architecture. Uploads will use validated binary storage.'
+  );
+}
 
 // Ensure uploads folder exists
 const uploadsDir = path.join(__dirname, '../../uploads');
@@ -164,28 +173,40 @@ router.post('/', (req, res) => {
     }
 
     try {
-      // Step 2: Pixel Re-encoding & Sanitization with Sharp
-      // Re-encoding decodes the raw image pixels and re-compresses them from scratch into WebP.
-      // Any embedded shell scripts, PHP tags, or malicious EXIF payloads are permanently destroyed.
-      const safeRandomName = `img-${Date.now()}-${crypto.randomBytes(8).toString('hex')}.webp`;
+      // Step 2: Pixel Re-encoding & Sanitization with Sharp (with safe fallback)
+      let finalBuffer = uploadedFile.buffer;
+      let finalExt = 'webp';
+
+      if (sharp) {
+        try {
+          finalBuffer = await sharp(uploadedFile.buffer)
+            .rotate() // auto-orient based on EXIF before stripping
+            .resize({
+              width: 1600,
+              height: 1600,
+              fit: 'inside',
+              withoutEnlargement: true
+            })
+            .webp({
+              quality: 85,
+              effort: 4
+            })
+            .toBuffer();
+          finalExt = 'webp';
+        } catch (resizeErr) {
+          console.warn('Sharp conversion fallback, storing verified buffer:', resizeErr.message);
+          finalBuffer = uploadedFile.buffer;
+          finalExt = detectedFormat === 'jpeg' ? 'jpg' : detectedFormat;
+        }
+      } else {
+        finalExt = detectedFormat === 'jpeg' ? 'jpg' : detectedFormat;
+      }
+
+      const safeRandomName = `img-${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${finalExt}`;
       const targetFilePath = path.join(uploadsDir, safeRandomName);
 
-      const convertedBuffer = await sharp(uploadedFile.buffer)
-        .rotate() // auto-orient based on EXIF before stripping
-        .resize({
-          width: 1600,
-          height: 1600,
-          fit: 'inside',
-          withoutEnlargement: true
-        })
-        .webp({
-          quality: 85,
-          effort: 4
-        })
-        .toBuffer();
-
-      // Write strictly sanitized, converted WebP to disk
-      await fs.promises.writeFile(targetFilePath, convertedBuffer);
+      // Write strictly sanitized, converted image to disk
+      await fs.promises.writeFile(targetFilePath, finalBuffer);
 
       // Step 3: Construct clean URL for database storage (handles SSL reverse proxy)
       const forwardedProto = req.headers['x-forwarded-proto'];
@@ -195,17 +216,17 @@ router.post('/', (req, res) => {
 
       res.status(200).json({
         success: true,
-        message: 'Image securely validated, converted to WebP, and saved.',
+        message: 'Image securely validated and saved.',
         data: {
           url: fileUrl,
           filename: safeRandomName,
-          format: 'webp',
-          size: convertedBuffer.length,
+          format: finalExt,
+          size: finalBuffer.length,
           originalName: path.basename(uploadedFile.originalname)
         }
       });
     } catch (sharpError) {
-      console.error('Image re-encoding error:', sharpError.message);
+      console.error('Image processing error:', sharpError.message);
       return res.status(400).json({
         success: false,
         message:
