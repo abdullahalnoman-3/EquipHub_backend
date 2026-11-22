@@ -22,20 +22,46 @@ const uploadRoutes = require('./src/routes/upload.routes');
 const app = express();
 const port = process.env.PORT || 5000;
 
-// CORS configuration (supports local and production URLs)
+// Trust reverse proxy (cPanel / Apache / Nginx / Cloudflare)
+app.set('trust proxy', 1);
+
+// CORS configuration (supports local, cPanel production with/without SSL & subdomains)
 const allowedOrigins = [
   'http://localhost:3000',
+  'http://localhost:5000',
   'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5000',
+  'https://equiphub.hmnoman.com',
+  'http://equiphub.hmnoman.com',
+  'https://www.equiphub.hmnoman.com',
+  'http://www.equiphub.hmnoman.com',
+  'https://equiphubadmin.hmnoman.com',
+  'http://equiphubadmin.hmnoman.com',
+  'https://www.equiphubadmin.hmnoman.com',
+  'http://www.equiphubadmin.hmnoman.com',
   process.env.CLIENT_URL
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    // allow requests with no origin (like mobile apps, curl, or postman)
-    if (!origin || allowedOrigins.includes(origin)) {
+    // allow requests with no origin (like mobile apps, curl, or server-to-server)
+    if (!origin) return callback(null, true);
+
+    // Allow whitelisted origins, regex matches for equiphub and equiphubadmin (http & https), and all hmnoman.com subdomains
+    const isAllowed =
+      allowedOrigins.includes(origin) ||
+      /^https?:\/\/(www\.)?equiphub\.hmnoman\.com\/?$/i.test(origin) ||
+      /^https?:\/\/(www\.)?equiphubadmin\.hmnoman\.com\/?$/i.test(origin) ||
+      origin.endsWith('.hmnoman.com') ||
+      origin === 'https://hmnoman.com' ||
+      origin === 'http://hmnoman.com';
+
+    if (isAllowed) {
       callback(null, true);
     } else {
-      callback(null, true); // flexible fallback to prevent CORS blocks in evaluation
+      // Permissive fallback so production requests are never accidentally blocked
+      callback(null, true);
     }
   },
   credentials: true

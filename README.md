@@ -4,12 +4,39 @@
 
 ---
 
-## 🌐 Live Services & URLs
+## 🌐 Live Services & Production URLs
 
-- **API Base URL:** `http://equiphubadmin.hmnoman.com/api/v1` (Local: `http://localhost:5000/api/v1`)
-- **Frontend Client:** `http://localhost:3000`
+- **Production API Base:** `https://equiphubadmin.hmnoman.com/api/v1` (SSL / Non-SSL: `http://equiphubadmin.hmnoman.com/api/v1`)
+- **Production Frontend Client:** `https://equiphub.hmnoman.com` (SSL / Non-SSL: `http://equiphub.hmnoman.com`)
+- **Local Dev API:** `http://localhost:5000/api/v1`
 - **GitHub Backend Repository:** [https://github.com/abdullahalnoman-3/EquipHub_backend.git](https://github.com/abdullahalnoman-3/EquipHub_backend.git)
 - **GitHub Frontend Repository:** [https://github.com/abdullahalnoman-3/EquipHub_frontend.git](https://github.com/abdullahalnoman-3/EquipHub_frontend.git)
+
+---
+
+## 🚀 cPanel Deployment Instructions (Backend)
+
+### Option A: Using cPanel "Setup Node.js App"
+1. In cPanel, navigate to **Software** > **Setup Node.js App**.
+2. Click **Create Application**:
+   - **Node.js Version:** `20.x` or `22.x`
+   - **Application Mode:** `Production`
+   - **Application Root:** `equiphub_backend` (or the folder path where you upload backend files)
+   - **Application URL:** `equiphubadmin.hmnoman.com`
+   - **Application Startup File:** `app.js` (or `index.js`)
+3. Upload backend source files (excluding `node_modules`).
+4. In the cPanel Node.js App interface, click **Run NPM Install** (or install dependencies via SSH terminal).
+5. In **Environment Variables** (or by creating a `.env` file in the application root), set:
+   ```env
+   NODE_ENV=production
+   PORT=5000
+   DB_URI=mongodb+srv://<username>:<password>@cluster0.2ssk8l9.mongodb.net/equiphub_db?retryWrites=true&w=majority
+   JWT_SECRET=equiphub_production_secret_key_2026
+   CLIENT_URL=https://equiphub.hmnoman.com
+   STRIPE_SECRET_KEY=sk_test_51MockStripeSecretKeyForTestingEquipHub2026
+   ```
+6. Click **Restart Application**.
+7. Visit `https://equiphubadmin.hmnoman.com/health` to verify server is live.
 
 ---
 

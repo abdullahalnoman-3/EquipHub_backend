@@ -187,8 +187,9 @@ router.post('/', (req, res) => {
       // Write strictly sanitized, converted WebP to disk
       await fs.promises.writeFile(targetFilePath, convertedBuffer);
 
-      // Step 3: Construct clean URL for database storage
-      const protocol = req.protocol;
+      // Step 3: Construct clean URL for database storage (handles SSL reverse proxy)
+      const forwardedProto = req.headers['x-forwarded-proto'];
+      const protocol = forwardedProto ? forwardedProto.split(',')[0].trim() : req.protocol;
       const host = req.get('host');
       const fileUrl = `${protocol}://${host}/uploads/${safeRandomName}`;
 
