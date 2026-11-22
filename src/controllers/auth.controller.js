@@ -6,7 +6,7 @@ const { generateToken, cookieOptions } = require('../utils/jwt');
 // register new user
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, photoURL, phone, address } = req.body;
+    const { name, email, password, photoURL, phone, address, role } = req.body;
 
     // validation
     if (!name || !email || !password) {
@@ -54,7 +54,7 @@ const registerUser = async (req, res) => {
       photoURL,
       phone,
       address,
-      role: 'Customer'
+      role
     });
 
     const result = await usersCollection.insertOne(newUser);
@@ -66,15 +66,21 @@ const registerUser = async (req, res) => {
       role: newUser.role
     });
 
+    const successMessage = newUser.ownerStatus === 'Pending'
+      ? 'Account registered! Your Equipment Owner application has been submitted to Admin for review.'
+      : 'User registered successfully';
+
     res.cookie('token', token, cookieOptions).status(201).json({
       success: true,
-      message: 'User registered successfully',
+      message: successMessage,
       token,
       user: {
         id: result.insertedId,
         name: newUser.name,
         email: newUser.email,
         role: newUser.role,
+        requestedRole: newUser.requestedRole,
+        ownerStatus: newUser.ownerStatus,
         photoURL: newUser.photoURL
       }
     });
@@ -139,6 +145,8 @@ const loginUser = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        requestedRole: user.requestedRole || (user.role === 'Owner' ? 'Owner' : 'Customer'),
+        ownerStatus: user.ownerStatus || (user.role === 'Owner' ? 'Approved' : 'None'),
         photoURL: user.photoURL || ''
       }
     });
@@ -197,6 +205,8 @@ const socialLogin = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        requestedRole: user.requestedRole || (user.role === 'Owner' ? 'Owner' : 'Customer'),
+        ownerStatus: user.ownerStatus || (user.role === 'Owner' ? 'Approved' : 'None'),
         photoURL: user.photoURL || ''
       }
     });

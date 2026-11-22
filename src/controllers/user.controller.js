@@ -112,9 +112,16 @@ const updateUserRole = async (req, res) => {
     }
 
     const { usersCollection } = getCollections();
+    const updateFields = { role, updatedAt: new Date() };
+    if (role === 'Owner') {
+      updateFields.ownerStatus = 'Approved';
+    } else if (role === 'Customer') {
+      updateFields.ownerStatus = 'None';
+    }
+
     const result = await usersCollection.updateOne(
       { _id: new ObjectId(id) },
-      { $set: { role, updatedAt: new Date() } }
+      { $set: updateFields }
     );
 
     if (result.matchedCount === 0) {
@@ -137,9 +144,65 @@ const updateUserRole = async (req, res) => {
   }
 };
 
+// update owner application status (Admin only)
+const updateOwnerStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body; // 'Approved' | 'Rejected'
+
+    if (!['Approved', 'Rejected'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid status. Must be Approved or Rejected'
+      });
+    }
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid user ID format'
+      });
+    }
+
+    const { usersCollection } = getCollections();
+    const isApproved = status === 'Approved';
+    const updateFields = {
+      ownerStatus: status,
+      role: isApproved ? 'Owner' : 'Customer',
+      updatedAt: new Date()
+    };
+
+    const result = await usersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updateFields }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: isApproved
+        ? 'Owner application approved successfully'
+        : 'Owner application rejected'
+    });
+  } catch (error) {
+    console.error('updateOwnerStatus error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update owner status'
+    });
+  }
+};
+
 module.exports = {
   getMyProfile,
   updateMyProfile,
   getAllUsers,
-  updateUserRole
+  updateUserRole,
+  updateOwnerStatus
 };
