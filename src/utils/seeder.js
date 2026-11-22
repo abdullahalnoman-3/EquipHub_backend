@@ -311,10 +311,16 @@ const seedData = async () => {
     const cameraItem = await equipmentCollection.findOne({ name: 'Sony Alpha A7 IV Cinema Kit' });
     const excavatorItem = await equipmentCollection.findOne({ name: 'CAT 320 Hydraulic Excavator' });
     const soundItem = await equipmentCollection.findOne({ name: 'JBL PRX ONE All-In-One Line Array PA System' });
+    const canonCamera = await equipmentCollection.findOne({ name: 'Canon EOS R5 C 8K Cinema Camera' });
+    const djiDrone = await equipmentCollection.findOne({ name: 'DJI Inspire 3 8K Cinema Drone' });
+    const mixerTruck = await equipmentCollection.findOne({ name: 'Concrete Mixer Truck 500L' });
+    const adminEquip = (await equipmentCollection.findOne({ name: 'Admin Caterpillar Excavator' })) || excavatorItem;
 
-    // 3. Seed Sample Bookings & Payments (so analytics show real data)
-    console.log('Seeding sample bookings and payments...');
+    // 3. Seed Sample Bookings & Payments for Owner & Admin (Pending, Approved, Active, Completed, Cancelled)
+    console.log('Seeding sample bookings and payments for Owner and Admin...');
     const bookingsToSeed = [
+      // --- OWNER BOOKINGS ---
+      // 1. Owner: Pending
       {
         customerInfo: {
           id: customerUser._id,
@@ -322,25 +328,55 @@ const seedData = async () => {
           email: customerUser.email,
           phone: customerUser.phone
         },
-        equipmentId: cameraItem._id,
-        equipmentName: cameraItem.name,
-        equipmentImage: cameraItem.image,
-        equipmentCategory: cameraItem.category,
+        equipmentId: canonCamera._id,
+        equipmentName: canonCamera.name,
+        equipmentImage: canonCamera.image,
+        equipmentCategory: canonCamera.category,
         ownerId: ownerUser._id,
         ownerName: ownerUser.name,
         ownerEmail: ownerUser.email,
-        rentalStartDate: new Date(Date.now() - 5 * 86400000),
-        rentalEndDate: new Date(Date.now() - 2 * 86400000),
-        bookingDate: new Date(Date.now() - 6 * 86400000),
+        rentalStartDate: new Date(Date.now() + 2 * 86400000),
+        rentalEndDate: new Date(Date.now() + 4 * 86400000),
+        bookingDate: new Date(),
         quantity: 1,
-        totalAmount: 195,
+        totalAmount: 220,
         paymentStatus: 'Paid',
-        bookingStatus: 'Completed',
-        transactionId: 'txn_stripe_sample_001',
-        deliveryAddress: 'Dhanmondi 27, Dhaka',
+        bookingStatus: 'Pending',
+        transactionId: 'txn_owner_pending_001',
+        deliveryAddress: 'House 45, Road 11, Banani, Dhaka',
         contactNumber: customerUser.phone,
-        createdAt: new Date(Date.now() - 6 * 86400000)
+        notes: 'Need camera with 2 extra batteries for documentary shoot.',
+        createdAt: new Date()
       },
+      // 2. Owner: Approved
+      {
+        customerInfo: {
+          id: new ObjectId(),
+          name: 'Tanvir Ahmed',
+          email: 'tanvir.event@gmail.com',
+          phone: '+880 1819-334455'
+        },
+        equipmentId: djiDrone._id,
+        equipmentName: djiDrone.name,
+        equipmentImage: djiDrone.image,
+        equipmentCategory: djiDrone.category,
+        ownerId: ownerUser._id,
+        ownerName: ownerUser.name,
+        ownerEmail: ownerUser.email,
+        rentalStartDate: new Date(Date.now() + 1 * 86400000),
+        rentalEndDate: new Date(Date.now() + 3 * 86400000),
+        bookingDate: new Date(Date.now() - 12 * 3600000),
+        quantity: 1,
+        totalAmount: 440,
+        paymentStatus: 'Paid',
+        bookingStatus: 'Approved',
+        transactionId: 'txn_owner_approved_002',
+        deliveryAddress: 'Gulshan 2 Circle, Dhaka',
+        contactNumber: '+880 1819-334455',
+        notes: 'Drone operator will pick up from warehouse.',
+        createdAt: new Date(Date.now() - 12 * 3600000)
+      },
+      // 3. Owner: Active
       {
         customerInfo: {
           id: customerUser._id,
@@ -355,34 +391,256 @@ const seedData = async () => {
         ownerId: ownerUser._id,
         ownerName: ownerUser.name,
         ownerEmail: ownerUser.email,
-        rentalStartDate: new Date(Date.now() + 1 * 86400000),
-        rentalEndDate: new Date(Date.now() + 3 * 86400000),
-        bookingDate: new Date(),
+        rentalStartDate: new Date(Date.now() - 1 * 86400000),
+        rentalEndDate: new Date(Date.now() + 2 * 86400000),
+        bookingDate: new Date(Date.now() - 2 * 86400000),
         quantity: 2,
         totalAmount: 380,
         paymentStatus: 'Paid',
         bookingStatus: 'Active',
-        transactionId: 'txn_stripe_sample_002',
-        deliveryAddress: 'Gulshan Club, Dhaka',
+        transactionId: 'txn_owner_active_003',
+        deliveryAddress: 'Dhanmondi Club, Road 27, Dhaka',
         contactNumber: customerUser.phone,
+        notes: 'Currently in active lease for weekend musical evening.',
+        createdAt: new Date(Date.now() - 2 * 86400000)
+      },
+      // 4. Owner: Completed
+      {
+        customerInfo: {
+          id: customerUser._id,
+          name: customerUser.name,
+          email: customerUser.email,
+          phone: customerUser.phone
+        },
+        equipmentId: cameraItem._id,
+        equipmentName: cameraItem.name,
+        equipmentImage: cameraItem.image,
+        equipmentCategory: cameraItem.category,
+        ownerId: ownerUser._id,
+        ownerName: ownerUser.name,
+        ownerEmail: ownerUser.email,
+        rentalStartDate: new Date(Date.now() - 6 * 86400000),
+        rentalEndDate: new Date(Date.now() - 3 * 86400000),
+        bookingDate: new Date(Date.now() - 7 * 86400000),
+        quantity: 1,
+        totalAmount: 195,
+        paymentStatus: 'Paid',
+        bookingStatus: 'Completed',
+        transactionId: 'txn_owner_completed_004',
+        deliveryAddress: 'Dhanmondi 27, Dhaka',
+        contactNumber: customerUser.phone,
+        notes: 'Lease concluded successfully, equipment returned in mint condition.',
+        createdAt: new Date(Date.now() - 7 * 86400000)
+      },
+      // 5. Owner: Cancelled (Refund Processing)
+      {
+        customerInfo: {
+          id: new ObjectId(),
+          name: 'Kamal Hossain',
+          email: 'kamal.constructions@yahoo.com',
+          phone: '+880 1912-778899'
+        },
+        equipmentId: mixerTruck._id,
+        equipmentName: mixerTruck.name,
+        equipmentImage: mixerTruck.image,
+        equipmentCategory: mixerTruck.category,
+        ownerId: ownerUser._id,
+        ownerName: ownerUser.name,
+        ownerEmail: ownerUser.email,
+        rentalStartDate: new Date(Date.now() + 3 * 86400000),
+        rentalEndDate: new Date(Date.now() + 5 * 86400000),
+        bookingDate: new Date(Date.now() - 2 * 86400000),
+        quantity: 1,
+        totalAmount: 280,
+        paymentStatus: 'Refund Processing',
+        bookingStatus: 'Cancelled',
+        transactionId: 'txn_owner_cancelled_005',
+        deliveryAddress: 'Plot 12, Sector 10, Uttara, Dhaka',
+        contactNumber: '+880 1912-778899',
+        notes: 'Site work postponed due to heavy rainfall.',
+        refundDetails: {
+          initiatedAt: new Date(Date.now() - 1 * 86400000),
+          amount: 280,
+          reason: 'Customer cancelled reservation due to site delay',
+          refundTxnId: 'ref_owner_mixer_005'
+        },
+        createdAt: new Date(Date.now() - 2 * 86400000)
+      },
+
+      // --- ADMIN BOOKINGS ---
+      // 6. Admin: Pending
+      {
+        customerInfo: {
+          id: new ObjectId(),
+          name: 'ali',
+          email: 'ali@gmail.com',
+          phone: '+880 1700-000000'
+        },
+        equipmentId: adminEquip._id,
+        equipmentName: adminEquip.name,
+        equipmentImage: adminEquip.image,
+        equipmentCategory: adminEquip.category,
+        ownerId: adminUser._id,
+        ownerName: adminUser.name,
+        ownerEmail: adminUser.email,
+        rentalStartDate: new Date(Date.now() + 3 * 86400000),
+        rentalEndDate: new Date(Date.now() + 6 * 86400000),
+        bookingDate: new Date(),
+        quantity: 1,
+        totalAmount: 1050,
+        paymentStatus: 'Paid',
+        bookingStatus: 'Pending',
+        transactionId: 'txn_admin_pending_001',
+        deliveryAddress: 'Mirpur DOHS, Dhaka',
+        contactNumber: '+880 1700-000000',
+        notes: 'Awaiting admin lease approval for site excavation.',
         createdAt: new Date()
+      },
+      // 7. Admin: Approved
+      {
+        customerInfo: {
+          id: new ObjectId(),
+          name: 'Rafiqul Islam',
+          email: 'rafiqul.agri@gmail.com',
+          phone: '+880 1611-889900'
+        },
+        equipmentId: adminEquip._id,
+        equipmentName: adminEquip.name,
+        equipmentImage: adminEquip.image,
+        equipmentCategory: adminEquip.category,
+        ownerId: adminUser._id,
+        ownerName: adminUser.name,
+        ownerEmail: adminUser.email,
+        rentalStartDate: new Date(Date.now() + 1 * 86400000),
+        rentalEndDate: new Date(Date.now() + 3 * 86400000),
+        bookingDate: new Date(Date.now() - 18 * 3600000),
+        quantity: 1,
+        totalAmount: 700,
+        paymentStatus: 'Paid',
+        bookingStatus: 'Approved',
+        transactionId: 'txn_admin_approved_002',
+        deliveryAddress: 'Savar EPZ Area, Dhaka',
+        contactNumber: '+880 1611-889900',
+        notes: 'Approved reservation ready for physical dispatch.',
+        createdAt: new Date(Date.now() - 18 * 3600000)
+      },
+      // 8. Admin: Active
+      {
+        customerInfo: {
+          id: new ObjectId(),
+          name: 'Asaduzzaman',
+          email: 'asad.logistics@gmail.com',
+          phone: '+880 1722-445566'
+        },
+        equipmentId: adminEquip._id,
+        equipmentName: adminEquip.name,
+        equipmentImage: adminEquip.image,
+        equipmentCategory: adminEquip.category,
+        ownerId: adminUser._id,
+        ownerName: adminUser.name,
+        ownerEmail: adminUser.email,
+        rentalStartDate: new Date(Date.now() - 1 * 86400000),
+        rentalEndDate: new Date(Date.now() + 3 * 86400000),
+        bookingDate: new Date(Date.now() - 3 * 86400000),
+        quantity: 1,
+        totalAmount: 1400,
+        paymentStatus: 'Paid',
+        bookingStatus: 'Active',
+        transactionId: 'txn_admin_active_003',
+        deliveryAddress: 'Purbachal Sector 4, Dhaka',
+        contactNumber: '+880 1722-445566',
+        notes: 'Currently in active lease on highway development project.',
+        createdAt: new Date(Date.now() - 3 * 86400000)
+      },
+      // 9. Admin: Completed
+      {
+        customerInfo: {
+          id: new ObjectId(),
+          name: 'Belal Uddin',
+          email: 'belal.builders@gmail.com',
+          phone: '+880 1833-556677'
+        },
+        equipmentId: adminEquip._id,
+        equipmentName: adminEquip.name,
+        equipmentImage: adminEquip.image,
+        equipmentCategory: adminEquip.category,
+        ownerId: adminUser._id,
+        ownerName: adminUser.name,
+        ownerEmail: adminUser.email,
+        rentalStartDate: new Date(Date.now() - 8 * 86400000),
+        rentalEndDate: new Date(Date.now() - 3 * 86400000),
+        bookingDate: new Date(Date.now() - 9 * 86400000),
+        quantity: 1,
+        totalAmount: 1750,
+        paymentStatus: 'Paid',
+        bookingStatus: 'Completed',
+        transactionId: 'txn_admin_completed_004',
+        deliveryAddress: 'Tejgaon Industrial Area, Dhaka',
+        contactNumber: '+880 1833-556677',
+        notes: '5-day commercial lease completed. Machine inspected & cleared.',
+        createdAt: new Date(Date.now() - 9 * 86400000)
+      },
+      // 10. Admin: Cancelled (Refund Processing)
+      {
+        customerInfo: {
+          id: new ObjectId(),
+          name: 'ali',
+          email: 'ali@gmail.com',
+          phone: '+880 1700-000000'
+        },
+        equipmentId: adminEquip._id,
+        equipmentName: adminEquip.name,
+        equipmentImage: adminEquip.image,
+        equipmentCategory: adminEquip.category,
+        ownerId: adminUser._id,
+        ownerName: adminUser.name,
+        ownerEmail: adminUser.email,
+        rentalStartDate: new Date(Date.now() - 1 * 86400000),
+        rentalEndDate: new Date(Date.now() + 1 * 86400000),
+        bookingDate: new Date(Date.now() - 2 * 86400000),
+        quantity: 1,
+        totalAmount: 700,
+        paymentStatus: 'Refund Processing',
+        bookingStatus: 'Cancelled',
+        transactionId: 'txn_admin_cancelled_005',
+        deliveryAddress: 'Bashundhara R/A, Block C, Dhaka',
+        contactNumber: '+880 1700-000000',
+        notes: 'Customer cancelled before lease activation.',
+        refundDetails: {
+          initiatedAt: new Date(Date.now() - 1 * 86400000),
+          amount: 700,
+          reason: 'Customer initiated reservation cancellation',
+          refundTxnId: 'ref_admin_excavator_005'
+        },
+        createdAt: new Date(Date.now() - 2 * 86400000)
       }
     ];
 
     for (const b of bookingsToSeed) {
       const existing = await bookingsCollection.findOne({ transactionId: b.transactionId });
+      let bId;
       if (!existing) {
         const res = await bookingsCollection.insertOne(b);
-        await paymentsCollection.insertOne({
-          bookingId: res.insertedId,
-          transactionId: b.transactionId,
-          amount: b.totalAmount,
-          customerEmail: b.customerInfo.email,
-          paymentDate: b.bookingDate,
-          paymentMethod: 'Stripe',
-          status: 'Completed'
-        });
+        bId = res.insertedId;
+      } else {
+        bId = existing._id;
+        await bookingsCollection.updateOne({ _id: bId }, { $set: b });
       }
+      await paymentsCollection.updateOne(
+        { transactionId: b.transactionId },
+        {
+          $set: {
+            bookingId: bId,
+            transactionId: b.transactionId,
+            amount: b.totalAmount,
+            customerEmail: b.customerInfo.email,
+            paymentDate: b.bookingDate,
+            paymentMethod: 'Stripe',
+            status: b.bookingStatus === 'Cancelled' ? 'Refund Processing' : 'Completed'
+          }
+        },
+        { upsert: true }
+      );
     }
 
     // 4. Seed Reviews (for home page Customer Reviews section)
@@ -539,6 +797,116 @@ const seedData = async () => {
         customerPhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
         rating: 5,
         comment: 'Extremely quiet as advertised. Provided clean, steady power for our audio recording consoles without a glitch.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 2 * 86400000)
+      },
+      {
+        equipmentName: 'CAT 320 Hydraulic Excavator',
+        customerName: 'Belal Uddin',
+        customerEmail: 'belal.builders@gmail.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
+        rating: 5,
+        comment: 'Excavator hydraulic controls were buttery smooth and fuel consumption was surprisingly economical.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 3 * 86400000)
+      },
+      {
+        equipmentName: 'Concrete Mixer Truck 500L',
+        customerName: 'Rafiqul Islam',
+        customerEmail: 'rafiqul.agri@gmail.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+        rating: 5,
+        comment: 'Mixed 8 batches of foundation concrete without a single stall. Excellent maintenance.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 2 * 86400000)
+      },
+      {
+        equipmentName: 'John Deere 5075E 4WD Utility Tractor',
+        customerName: 'Mokbul Hossain',
+        customerEmail: 'mokbul.farms@yahoo.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400',
+        rating: 5,
+        comment: 'Strong 4WD traction in muddy soil. 3-point hitch made attaching our cultivator effortless.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 3 * 86400000)
+      },
+      {
+        equipmentName: 'Heavy Duty Rotary Power Tiller',
+        customerName: 'Rafiqul Islam',
+        customerEmail: 'rafiqul.agri@gmail.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+        rating: 5,
+        comment: 'Starts on the first pull and tilled our vegetable plots in record time. Very satisfied.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 2 * 86400000)
+      },
+      {
+        equipmentName: 'Isuzu NPR 4-Ton Cargo Box Truck',
+        customerName: 'Tanvir Ahmed',
+        customerEmail: 'tanvir.event@gmail.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
+        rating: 5,
+        comment: 'Spacious 4-ton capacity and very smooth highway drive. Owner was punctual with key handover.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 2 * 86400000)
+      },
+      {
+        equipmentName: 'Honda EU3000i Super Quiet Inverter Generator',
+        customerName: 'Sadia Rahman',
+        customerEmail: 'customer@equiphub.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
+        rating: 5,
+        comment: 'Ran non-stop for 10 hours on our outdoor fashion film set. Low fuel consumption and zero noise interference.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 1 * 86400000)
+      },
+      {
+        equipmentName: 'JBL PRX ONE All-In-One Line Array PA System',
+        customerName: 'Shamim Reza',
+        customerEmail: 'shamim.sound@gmail.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
+        rating: 5,
+        comment: '7-channel mixer with built-in DSP made live acoustic tuning quick and hassle-free. Crisp highs and deep bass.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 3 * 86400000)
+      },
+      {
+        equipmentName: 'DJI Inspire 3 8K Cinema Drone',
+        customerName: 'Kamal Hossain',
+        customerEmail: 'kamal.constructions@yahoo.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400',
+        rating: 5,
+        comment: 'Top tier aerial platform. Dual control mode worked flawlessly for our commercial shoot in Gulshan.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 4 * 86400000)
+      },
+      {
+        equipmentName: 'Admin Caterpillar Excavator',
+        customerName: 'ali',
+        customerEmail: 'ali@gmail.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=400',
+        rating: 5,
+        comment: 'Heavy duty excavator operated perfectly for our site grading work. Quick support from the admin.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 5 * 86400000)
+      },
+      {
+        equipmentName: 'Admin Caterpillar Excavator',
+        customerName: 'Kamal Hossain',
+        customerEmail: 'kamal.constructions@yahoo.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400',
+        rating: 5,
+        comment: 'Super clean machine and powerful hydraulics. Fast approval from admin and on-site delivery was spot on.',
         status: 'Approved',
         isActive: true,
         createdAt: new Date(Date.now() - 2 * 86400000)
