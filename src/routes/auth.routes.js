@@ -6,6 +6,7 @@ const {
   socialLogin,
   logoutUser
 } = require('../controllers/auth.controller');
+const { getPublicSocialConfig } = require('../controllers/setting.controller');
 const { getMyProfile } = require('../controllers/user.controller');
 const { verifyToken } = require('../middlewares/auth.middleware');
 
@@ -14,6 +15,7 @@ router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.post('/social-login', socialLogin);
 router.post('/logout', logoutUser);
+router.get('/social-config', getPublicSocialConfig);
 router.get('/me', verifyToken, getMyProfile);
 
 module.exports = router;

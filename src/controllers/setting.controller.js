@@ -248,10 +248,151 @@ const testPaymentGateway = async (req, res) => {
   }
 };
 
+// get current Social Login settings (Admin only)
+const getSocialSettings = async (req, res) => {
+  try {
+    const { settingsCollection } = getCollections();
+    const config = await settingsCollection.findOne({ key: 'social_login_settings' });
+
+    const defaultOrigin = process.env.CLIENT_URL || 'http://localhost:3000';
+
+    const data = {
+      google: {
+        clientId: config?.google?.clientId || process.env.GOOGLE_CLIENT_ID || '',
+        clientSecret: config?.google?.clientSecret ? '********' : (process.env.GOOGLE_CLIENT_SECRET ? '********' : ''),
+        isEnabled: config?.google?.isEnabled !== undefined ? config.google.isEnabled : true,
+        redirectUri: config?.google?.redirectUri || `${defaultOrigin}/api/auth/callback/google`,
+        originUri: config?.google?.originUri || defaultOrigin
+      },
+      github: {
+        clientId: config?.github?.clientId || process.env.GITHUB_CLIENT_ID || '',
+        clientSecret: config?.github?.clientSecret ? '********' : (process.env.GITHUB_CLIENT_SECRET ? '********' : ''),
+        isEnabled: config?.github?.isEnabled !== undefined ? config.github.isEnabled : true,
+        redirectUri: config?.github?.redirectUri || `${defaultOrigin}/api/auth/callback/github`,
+        homepageUrl: config?.github?.homepageUrl || defaultOrigin
+      },
+      isConfigured: !!(config?.google?.clientId || config?.github?.clientId || process.env.GOOGLE_CLIENT_ID || process.env.GITHUB_CLIENT_ID),
+      updatedAt: config?.updatedAt || null
+    };
+
+    res.status(200).json({
+      success: true,
+      data
+    });
+  } catch (error) {
+    console.error('getSocialSettings error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch social login settings'
+    });
+  }
+};
+
+// update Social Login settings (Admin only)
+const updateSocialSettings = async (req, res) => {
+  try {
+    const { google, github } = req.body;
+    const { settingsCollection } = getCollections();
+
+    const existingConfig = await settingsCollection.findOne({ key: 'social_login_settings' });
+
+    const defaultOrigin = process.env.CLIENT_URL || 'http://localhost:3000';
+
+    const updateData = {
+      key: 'social_login_settings',
+      google: {
+        clientId: (google?.clientId !== undefined ? google.clientId : existingConfig?.google?.clientId || '').trim(),
+        clientSecret: (google?.clientSecret && google.clientSecret.trim() !== '********')
+          ? google.clientSecret.trim()
+          : (existingConfig?.google?.clientSecret || process.env.GOOGLE_CLIENT_SECRET || ''),
+        isEnabled: google?.isEnabled !== undefined ? Boolean(google.isEnabled) : (existingConfig?.google?.isEnabled ?? true),
+        redirectUri: (google?.redirectUri || existingConfig?.google?.redirectUri || `${defaultOrigin}/api/auth/callback/google`).trim(),
+        originUri: (google?.originUri || existingConfig?.google?.originUri || defaultOrigin).trim()
+      },
+      github: {
+        clientId: (github?.clientId !== undefined ? github.clientId : existingConfig?.github?.clientId || '').trim(),
+        clientSecret: (github?.clientSecret && github.clientSecret.trim() !== '********')
+          ? github.clientSecret.trim()
+          : (existingConfig?.github?.clientSecret || process.env.GITHUB_CLIENT_SECRET || ''),
+        isEnabled: github?.isEnabled !== undefined ? Boolean(github.isEnabled) : (existingConfig?.github?.isEnabled ?? true),
+        redirectUri: (github?.redirectUri || existingConfig?.github?.redirectUri || `${defaultOrigin}/api/auth/callback/github`).trim(),
+        homepageUrl: (github?.homepageUrl || existingConfig?.github?.homepageUrl || defaultOrigin).trim()
+      },
+      updatedAt: new Date()
+    };
+
+    await settingsCollection.updateOne(
+      { key: 'social_login_settings' },
+      { $set: updateData },
+      { upsert: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Social login credentials and redirect URLs saved successfully',
+      data: {
+        google: {
+          clientId: updateData.google.clientId,
+          isEnabled: updateData.google.isEnabled,
+          redirectUri: updateData.google.redirectUri,
+          originUri: updateData.google.originUri
+        },
+        github: {
+          clientId: updateData.github.clientId,
+          isEnabled: updateData.github.isEnabled,
+          redirectUri: updateData.github.redirectUri,
+          homepageUrl: updateData.github.homepageUrl
+        },
+        updatedAt: updateData.updatedAt
+      }
+    });
+  } catch (error) {
+    console.error('updateSocialSettings error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update social login settings'
+    });
+  }
+};
+
+// public endpoint to read enabled status and public client IDs for frontend auth buttons
+const getPublicSocialConfig = async (req, res) => {
+  try {
+    const { settingsCollection } = getCollections();
+    const config = await settingsCollection.findOne({ key: 'social_login_settings' });
+    const defaultOrigin = process.env.CLIENT_URL || 'http://localhost:3000';
+
+    res.status(200).json({
+      success: true,
+      data: {
+        google: {
+          clientId: config?.google?.clientId || process.env.GOOGLE_CLIENT_ID || '',
+          isEnabled: config?.google?.isEnabled !== undefined ? config.google.isEnabled : true,
+          redirectUri: config?.google?.redirectUri || `${defaultOrigin}/api/auth/callback/google`
+        },
+        github: {
+          clientId: config?.github?.clientId || process.env.GITHUB_CLIENT_ID || '',
+          isEnabled: config?.github?.isEnabled !== undefined ? config.github.isEnabled : true,
+          redirectUri: config?.github?.redirectUri || `${defaultOrigin}/api/auth/callback/github`
+        }
+      }
+    });
+  } catch (error) {
+    console.error('getPublicSocialConfig error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch public social configuration'
+    });
+  }
+};
+
 module.exports = {
   getSMTPSettings,
   updateSMTPSettings,
   getPaymentSettings,
   updatePaymentSettings,
-  testPaymentGateway
+  testPaymentGateway,
+  getSocialSettings,
+  updateSocialSettings,
+  getPublicSocialConfig
 };

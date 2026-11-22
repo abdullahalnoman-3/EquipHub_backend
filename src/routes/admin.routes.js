@@ -15,7 +15,9 @@ const {
   updateSMTPSettings,
   getPaymentSettings,
   updatePaymentSettings,
-  testPaymentGateway
+  testPaymentGateway,
+  getSocialSettings,
+  updateSocialSettings
 } = require('../controllers/setting.controller');
 const { verifyToken, verifyAdmin } = require('../middlewares/auth.middleware');
 
@@ -42,5 +44,9 @@ router.patch('/smtp', updateSMTPSettings);
 router.get('/payment-settings', getPaymentSettings);
 router.patch('/payment-settings', updatePaymentSettings);
 router.post('/payment-settings/test', testPaymentGateway);
+
+// admin Social Login OAuth configuration routes
+router.get('/social-settings', getSocialSettings);
+router.patch('/social-settings', updateSocialSettings);
 
 module.exports = router;
