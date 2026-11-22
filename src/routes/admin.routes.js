@@ -12,7 +12,10 @@ const {
 } = require('../controllers/review.controller');
 const {
   getSMTPSettings,
-  updateSMTPSettings
+  updateSMTPSettings,
+  getPaymentSettings,
+  updatePaymentSettings,
+  testPaymentGateway
 } = require('../controllers/setting.controller');
 const { verifyToken, verifyAdmin } = require('../middlewares/auth.middleware');
 
@@ -34,5 +37,10 @@ router.patch('/reviews/:id/status', updateReviewStatusAdmin);
 // admin SMTP configuration routes
 router.get('/smtp', getSMTPSettings);
 router.patch('/smtp', updateSMTPSettings);
+
+// admin Payment Gateway configuration routes
+router.get('/payment-settings', getPaymentSettings);
+router.patch('/payment-settings', updatePaymentSettings);
+router.post('/payment-settings/test', testPaymentGateway);
 
 module.exports = router;

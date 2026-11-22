@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const path = require('path');
 require('dotenv').config();
 const { connectDB } = require('./src/config/db');
 const { initRentalCronJob } = require('./src/utils/cron');
@@ -16,6 +17,7 @@ const paymentRoutes = require('./src/routes/payment.routes');
 const bookingRoutes = require('./src/routes/booking.routes');
 const analyticsRoutes = require('./src/routes/analytics.routes');
 const reviewRoutes = require('./src/routes/review.routes');
+const uploadRoutes = require('./src/routes/upload.routes');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -39,10 +41,27 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
+// serve uploaded project files statically with security headers (nosniff & no directory listing)
+app.use(
+  '/uploads',
+  (req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:;");
+    next();
+  },
+  express.static(path.join(__dirname, 'uploads'), {
+    dotfiles: 'deny',
+    index: false,
+    maxAge: '7d'
+  })
+);
+
 // application routes
+app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/equipment', equipmentRoutes);
@@ -79,7 +98,7 @@ app.use(globalErrorHandler);
 const startServer = async () => {
   try {
     await connectDB();
-    
+
     // start background automated cron jobs
     initRentalCronJob();
 

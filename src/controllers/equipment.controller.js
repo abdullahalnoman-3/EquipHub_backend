@@ -75,12 +75,54 @@ const getAllPublicEquipment = async (req, res) => {
       .limit(limitNum)
       .toArray();
 
+    const { reviewsCollection } = getCollections();
+
+    // Dynamically calculate product-specific review stats for every item
+    const enrichedEquipment = await Promise.all(
+      equipment.map(async (item) => {
+        const reviewStats = await reviewsCollection
+          .aggregate([
+            {
+              $match: {
+                equipmentId: new ObjectId(item._id),
+                status: 'Approved',
+                isActive: true
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                avgRating: { $avg: '$rating' },
+                totalReviews: { $sum: 1 }
+              }
+            }
+          ])
+          .toArray();
+
+        const hasStats = reviewStats && reviewStats.length > 0;
+        const rating = hasStats
+          ? Math.round(reviewStats[0].avgRating * 10) / 10
+          : (typeof item.averageRating === 'number' ? item.averageRating : 0);
+        const total = hasStats
+          ? reviewStats[0].totalReviews
+          : (typeof item.reviewCount === 'number' ? item.reviewCount : 0);
+
+        return {
+          ...item,
+          averageRating: rating,
+          rating,
+          reviewCount: total,
+          totalReviews: total
+        };
+      })
+    );
+
     res.status(200).json({
       success: true,
       totalCount,
       currentPage: pageNum,
       totalPages: Math.ceil(totalCount / limitNum),
-      data: equipment
+      data: enrichedEquipment
     });
   } catch (error) {
     console.error('getAllPublicEquipment error:', error.message);
@@ -103,7 +145,7 @@ const getEquipmentById = async (req, res) => {
       });
     }
 
-    const { equipmentCollection } = getCollections();
+    const { equipmentCollection, reviewsCollection } = getCollections();
     const equipment = await equipmentCollection.findOne({ _id: new ObjectId(id) });
 
     if (!equipment) {
@@ -113,9 +155,45 @@ const getEquipmentById = async (req, res) => {
       });
     }
 
+    // Aggregate real-time product reviews
+    const reviewStats = await reviewsCollection
+      .aggregate([
+        {
+          $match: {
+            equipmentId: new ObjectId(id),
+            status: 'Approved',
+            isActive: true
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            avgRating: { $avg: '$rating' },
+            totalReviews: { $sum: 1 }
+          }
+        }
+      ])
+      .toArray();
+
+    const hasStats = reviewStats && reviewStats.length > 0;
+    const realRating = hasStats
+      ? Math.round(reviewStats[0].avgRating * 10) / 10
+      : (typeof equipment.averageRating === 'number' ? equipment.averageRating : 0);
+    const realTotal = hasStats
+      ? reviewStats[0].totalReviews
+      : (typeof equipment.reviewCount === 'number' ? equipment.reviewCount : 0);
+
+    const enrichedEquipment = {
+      ...equipment,
+      averageRating: realRating,
+      rating: realRating,
+      reviewCount: realTotal,
+      totalReviews: realTotal
+    };
+
     res.status(200).json({
       success: true,
-      data: equipment
+      data: enrichedEquipment
     });
   } catch (error) {
     console.error('getEquipmentById error:', error.message);
@@ -204,8 +282,8 @@ const updateEquipment = async (req, res) => {
       });
     }
 
-    // verify ownership
-    if (equipment.owner.email !== req.user.email) {
+    // verify ownership (Admins have full permission over equipment)
+    if (equipment.owner.email !== req.user.email && req.user.role !== 'Admin') {
       return res.status(403).json({
         success: false,
         message: 'You can only update your own equipment'
@@ -271,11 +349,26 @@ const deleteEquipment = async (req, res) => {
       });
     }
 
-    // verify ownership
-    if (equipment.owner.email !== req.user.email) {
+    // verify ownership (Admins have full permission over equipment)
+    if (equipment.owner.email !== req.user.email && req.user.role !== 'Admin') {
       return res.status(403).json({
         success: false,
         message: 'You can only delete your own equipment'
+      });
+    }
+
+    // Check if equipment has any associated rental orders/bookings
+    const { bookingsCollection } = getCollections();
+    const existingOrdersCount = await bookingsCollection.countDocuments({
+      equipmentId: new ObjectId(id)
+    });
+
+    if (existingOrdersCount > 0) {
+      return res.status(400).json({
+        success: false,
+        hasOrders: true,
+        orderCount: existingOrdersCount,
+        message: `Cannot delete equipment. There are ${existingOrdersCount} rental order(s) associated with this equipment. Please delete those rental orders first.`
       });
     }
 

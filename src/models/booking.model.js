@@ -22,7 +22,7 @@ const createBookingObject = (bookingData, user, equipment) => {
     quantity: Number(bookingData.quantity),
     totalAmount: Number(bookingData.totalAmount),
     paymentStatus: 'Paid', // default paid via stripe
-    bookingStatus: 'Active', // pending, active, completed, cancelled
+    bookingStatus: 'Pending', // pending, approved, active, completed, rejected, cancelled
     transactionId: bookingData.transactionId || '',
     deliveryAddress: bookingData.deliveryAddress || '',
     contactNumber: bookingData.contactNumber || '',

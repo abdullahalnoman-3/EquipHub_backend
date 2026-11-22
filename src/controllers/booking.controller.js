@@ -3,7 +3,8 @@ const { getCollections } = require('../config/db');
 const { createBookingObject, createPaymentObject } = require('../models/booking.model');
 const {
   sendBookingConfirmationToCustomer,
-  sendRentalAlertToOwner
+  sendRentalAlertToOwner,
+  sendRefundNotificationToCustomer
 } = require('../services/email.service');
 
 // create new booking after successful stripe payment
@@ -36,6 +37,36 @@ const createBooking = async (req, res) => {
     }
 
     const { bookingsCollection, equipmentCollection, paymentsCollection } = getCollections();
+
+    // 1. Prevent duplicate bookings by transactionId (Idempotency)
+    if (transactionId) {
+      const existingByTxn = await bookingsCollection.findOne({ transactionId });
+      if (existingByTxn) {
+        return res.status(200).json({
+          success: true,
+          message: 'Booking already recorded',
+          bookingId: existingByTxn._id,
+          isDuplicate: true
+        });
+      }
+    }
+
+    // 2. Prevent rapid duplicate submissions (within 15 seconds for same customer & equipment)
+    const recentDuplicate = await bookingsCollection.findOne({
+      'customerInfo.email': req.user.email,
+      equipmentId: new ObjectId(equipmentId),
+      startDate: new Date(startDate),
+      endDate: new Date(endDate),
+      createdAt: { $gte: new Date(Date.now() - 15 * 1000) }
+    });
+    if (recentDuplicate) {
+      return res.status(200).json({
+        success: true,
+        message: 'Booking already recorded',
+        bookingId: recentDuplicate._id,
+        isDuplicate: true
+      });
+    }
 
     // find equipment
     const equipment = await equipmentCollection.findOne({ _id: new ObjectId(equipmentId) });
@@ -164,11 +195,11 @@ const updateBookingStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    const allowedStatuses = ['Active', 'Completed', 'Cancelled'];
+    const allowedStatuses = ['Pending', 'Approved', 'Active', 'Completed', 'Rejected', 'Cancelled'];
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid status. Must be Active, Completed, or Cancelled'
+        message: 'Invalid status. Must be Pending, Approved, Active, Completed, Rejected, or Cancelled'
       });
     }
 
@@ -189,33 +220,105 @@ const updateBookingStatus = async (req, res) => {
       });
     }
 
-    // verify permission: Admin or Owner of this equipment
+    // verify permission: Admin, Owner of this equipment, or the Customer who placed the booking
     const isOwner = booking.ownerEmail === req.user.email;
     const isAdmin = req.user.role === 'Admin';
+    const isCustomer = booking.customerInfo?.email === req.user.email;
 
-    if (!isOwner && !isAdmin) {
+    if (!isOwner && !isAdmin && !isCustomer) {
       return res.status(403).json({
         success: false,
         message: 'You are not authorized to update this booking'
       });
     }
 
-    // if cancelled, restore available equipment inventory
-    if (status === 'Cancelled' && booking.bookingStatus !== 'Cancelled') {
+    // Customer specific rule: Can cancel only their own reservation if Pending or Approved
+    if (isCustomer && !isOwner && !isAdmin) {
+      if (status !== 'Cancelled') {
+        return res.status(403).json({
+          success: false,
+          message: 'Customers are only permitted to cancel their own reservation'
+        });
+      }
+      const currentStatus = booking.bookingStatus?.toLowerCase();
+      if (currentStatus !== 'pending' && currentStatus !== 'approved') {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot cancel rental with status "${booking.bookingStatus}". Only Pending and Approved rentals can be cancelled.`
+        });
+      }
+    }
+
+    // Business Rule: Active rentals cannot be cancelled or rejected
+    if (booking.bookingStatus === 'Active' && (status === 'Cancelled' || status === 'Rejected')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Active rentals cannot be cancelled or rejected. The equipment is currently in use and can only be marked as Completed upon return.'
+      });
+    }
+
+    const isCancelOrReject = status === 'Cancelled' || status === 'Rejected';
+    const wasCancelOrReject = booking.bookingStatus === 'Cancelled' || booking.bookingStatus === 'Rejected';
+
+    // if cancelling or rejecting, restore available equipment inventory
+    if (isCancelOrReject && !wasCancelOrReject) {
       await equipmentCollection.updateOne(
         { _id: new ObjectId(booking.equipmentId) },
         { $inc: { availableQuantity: Number(booking.quantity) } }
       );
+    } else if (!isCancelOrReject && wasCancelOrReject) {
+      // if un-cancelling (e.g. approving an order), deduct inventory
+      await equipmentCollection.updateOne(
+        { _id: new ObjectId(booking.equipmentId) },
+        { $inc: { availableQuantity: -Number(booking.quantity) } }
+      );
+    }
+
+    const updateDoc = {
+      bookingStatus: status,
+      updatedAt: new Date()
+    };
+
+    // If cancelled or rejected, immediately initiate the Refund Process
+    if (isCancelOrReject && !wasCancelOrReject) {
+      updateDoc.paymentStatus = 'Refund Processing';
+      updateDoc.refundDetails = {
+        status: 'Processing',
+        amount: Number(booking.totalAmount),
+        initiatedBy: isCustomer ? 'Customer' : (isAdmin ? 'Admin' : 'Owner'),
+        initiatedAt: new Date(),
+        reason: isCustomer ? 'Customer cancelled reservation' : 'Reservation rejected or cancelled by owner/admin',
+        estimatedProcessingTime: '3-5 business days'
+      };
+
+      const { paymentsCollection } = getCollections();
+      if (paymentsCollection) {
+        await paymentsCollection.updateOne(
+          { bookingId: new ObjectId(id) },
+          {
+            $set: {
+              status: 'Refund Processing',
+              refundAmount: Number(booking.totalAmount),
+              refundInitiatedAt: new Date()
+            }
+          }
+        );
+      }
+
+      // Send refund email to customer in background
+      sendRefundNotificationToCustomer(booking).catch(err => {
+        console.log('Refund notification notice:', err.message);
+      });
     }
 
     await bookingsCollection.updateOne(
       { _id: new ObjectId(id) },
-      { $set: { bookingStatus: status, updatedAt: new Date() } }
+      { $set: updateDoc }
     );
 
     res.status(200).json({
       success: true,
-      message: `Booking status updated to ${status} successfully`
+      message: `Booking status updated to ${status} successfully. ${isCancelOrReject ? 'Payment has been sent to the Refund Process.' : ''}`
     });
   } catch (error) {
     console.error('updateBookingStatus error:', error.message);
@@ -226,9 +329,72 @@ const updateBookingStatus = async (req, res) => {
   }
 };
 
+// delete booking record (Owner of equipment or Admin)
+const deleteBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid booking ID format'
+      });
+    }
+
+    const { bookingsCollection, equipmentCollection, paymentsCollection } = getCollections();
+    const booking = await bookingsCollection.findOne({ _id: new ObjectId(id) });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Rental order not found'
+      });
+    }
+
+    // verify permission: Admin or Owner of this equipment
+    const isOwner = booking.ownerEmail === req.user.email;
+    const isAdmin = req.user.role === 'Admin';
+
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'You are not authorized to delete this rental order'
+      });
+    }
+
+    // If order was holding inventory (not Cancelled or Rejected), restore inventory to equipment
+    if (booking.bookingStatus !== 'Cancelled' && booking.bookingStatus !== 'Rejected') {
+      await equipmentCollection.updateOne(
+        { _id: new ObjectId(booking.equipmentId) },
+        { $inc: { availableQuantity: Number(booking.quantity) } }
+      );
+    }
+
+    // Delete the booking record
+    await bookingsCollection.deleteOne({ _id: new ObjectId(id) });
+
+    // Clean up associated payment records
+    if (paymentsCollection) {
+      await paymentsCollection.deleteMany({ bookingId: new ObjectId(id) });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Rental order deleted successfully'
+    });
+  } catch (error) {
+    console.error('deleteBooking error:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete rental order'
+    });
+  }
+};
+
 module.exports = {
   createBooking,
   getMyRentals,
   getOwnerRentals,
-  updateBookingStatus
+  updateBookingStatus,
+  deleteBooking
 };

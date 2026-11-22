@@ -66,17 +66,19 @@ const createReview = async (req, res) => {
       });
     }
 
-    // verify user has rented this equipment
-    const hasBooked = await bookingsCollection.findOne({
-      'customerInfo.email': req.user.email,
-      equipmentId: new ObjectId(equipmentId)
-    });
-
-    if (!hasBooked) {
-      return res.status(403).json({
-        success: false,
-        message: 'You can only review equipment you have previously rented'
+    // verify user has rented this equipment (Admins have full testing and review permissions)
+    if (req.user?.role !== 'Admin') {
+      const hasBooked = await bookingsCollection.findOne({
+        'customerInfo.email': req.user.email,
+        equipmentId: new ObjectId(equipmentId)
       });
+
+      if (!hasBooked) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only review equipment you have previously rented'
+        });
+      }
     }
 
     // prevent duplicate reviews

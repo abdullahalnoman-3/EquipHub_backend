@@ -4,7 +4,8 @@ const {
   createBooking,
   getMyRentals,
   getOwnerRentals,
-  updateBookingStatus
+  updateBookingStatus,
+  deleteBooking
 } = require('../controllers/booking.controller');
 const { verifyToken, verifyCustomer, verifyOwner } = require('../middlewares/auth.middleware');
 
@@ -17,5 +18,8 @@ router.get('/owner-rentals', verifyToken, verifyOwner, getOwnerRentals);
 
 // update booking status route (Owner or Admin)
 router.patch('/:id/status', verifyToken, updateBookingStatus);
+
+// delete rental order route (Owner or Admin)
+router.delete('/:id', verifyToken, deleteBooking);
 
 module.exports = router;

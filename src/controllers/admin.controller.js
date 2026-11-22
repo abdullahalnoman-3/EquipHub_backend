@@ -100,7 +100,22 @@ const deleteAdminEquipment = async (req, res) => {
       });
     }
 
-    const { equipmentCollection } = getCollections();
+    const { equipmentCollection, bookingsCollection } = getCollections();
+
+    // Check if equipment has any associated rental orders/bookings
+    const existingOrdersCount = await bookingsCollection.countDocuments({
+      equipmentId: new ObjectId(id)
+    });
+
+    if (existingOrdersCount > 0) {
+      return res.status(400).json({
+        success: false,
+        hasOrders: true,
+        orderCount: existingOrdersCount,
+        message: `Cannot delete equipment. There are ${existingOrdersCount} rental order(s) associated with this equipment. Please delete those rental orders first.`
+      });
+    }
+
     const result = await equipmentCollection.deleteOne({ _id: new ObjectId(id) });
 
     if (result.deletedCount === 0) {

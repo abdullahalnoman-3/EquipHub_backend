@@ -65,23 +65,23 @@ const verifyAdmin = (req, res, next) => {
   next();
 };
 
-// verify owner role middleware
+// verify owner role middleware (Admins have full superuser rights, including Owner capabilities)
 const verifyOwner = (req, res, next) => {
-  if (req.user?.role !== 'Owner') {
+  if (req.user?.role !== 'Owner' && req.user?.role !== 'Admin') {
     return res.status(403).json({
       success: false,
-      message: 'Forbidden access. Equipment Owner only'
+      message: 'Forbidden access. Equipment Owner or Admin only'
     });
   }
   next();
 };
 
-// verify renter/customer role middleware
+// verify renter/customer role middleware (Admins have full superuser rights, including Customer capabilities)
 const verifyRenter = (req, res, next) => {
-  if (req.user?.role !== 'Customer' && req.user?.role !== 'Renter') {
+  if (req.user?.role !== 'Customer' && req.user?.role !== 'Renter' && req.user?.role !== 'Admin') {
     return res.status(403).json({
       success: false,
-      message: 'Forbidden access. Renter only'
+      message: 'Forbidden access. Renter or Admin only'
     });
   }
   next();

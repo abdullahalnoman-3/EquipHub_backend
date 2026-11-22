@@ -65,13 +65,15 @@ const createEquipmentObject = (data, owner) => {
     model: data.model ? data.model.trim() : '',
     image: data.image.trim(),
     terms: data.terms ? data.terms.trim() : 'Standard rental terms apply.',
-    status: 'Pending', // default pending until admin approves
+    status: owner.role === 'Admin' ? 'Approved' : 'Pending', // Admins are automatically pre-approved
     owner: {
       id: new ObjectId(owner._id),
       name: owner.name,
       email: owner.email
     },
     location: data.location.trim(),
+    averageRating: 0,
+    reviewCount: 0,
     createdAt: new Date(),
     updatedAt: new Date()
   };

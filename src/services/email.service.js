@@ -135,9 +135,35 @@ const sendEquipmentStatusToOwner = async (equipment, status) => {
   return sendEmail({ to: equipment.owner.email, subject, html });
 };
 
+// send refund processing notification to customer
+const sendRefundNotificationToCustomer = async (booking) => {
+  const subject = `[EquipHub] Rental Cancelled - Refund Processing for ${booking.equipmentName}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1e293b;">
+      <h2 style="color: #6366f1;">Rental Cancellation & Refund Confirmation</h2>
+      <p>Hello <strong>${booking.customerInfo?.name || 'Valued Customer'}</strong>,</p>
+      <p>Your rental reservation for <strong>${booking.equipmentName}</strong> has been cancelled.</p>
+      
+      <div style="background-color: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 8px; padding: 16px; margin: 20px 0;">
+        <p style="margin: 4px 0;"><strong>Refund Amount:</strong> $${booking.totalAmount}</p>
+        <p style="margin: 4px 0;"><strong>Refund Status:</strong> <span style="color: #7c3aed; font-weight: bold;">Processing</span></p>
+        <p style="margin: 4px 0;"><strong>Estimated Time:</strong> 3-5 business days to your original payment method</p>
+        <p style="margin: 4px 0;"><strong>Transaction ID:</strong> ${booking.transactionId || 'N/A'}</p>
+      </div>
+
+      <p style="color: #64748b; font-size: 14px;">
+        If you have any questions regarding your refund, please feel free to reach out to our support team.
+      </p>
+    </div>
+  `;
+
+  return sendEmail({ to: booking.customerInfo?.email, subject, html });
+};
+
 module.exports = {
   sendEmail,
   sendBookingConfirmationToCustomer,
   sendRentalAlertToOwner,
-  sendEquipmentStatusToOwner
+  sendEquipmentStatusToOwner,
+  sendRefundNotificationToCustomer
 };

@@ -3,9 +3,44 @@ const Stripe = require('stripe');
 const { getCollections } = require('../config/db');
 const { calculateRentalPrice } = require('../utils/pricing');
 
-// initialize stripe
-const getStripe = () => {
-  return Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
+// initialize stripe with dynamic database credentials or environment fallback
+const getStripe = async () => {
+  try {
+    const { settingsCollection } = getCollections();
+    const config = await settingsCollection?.findOne({ key: 'payment_settings' });
+    const secretKey = config?.secretKey || process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder';
+    return Stripe(secretKey);
+  } catch {
+    return Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
+  }
+};
+
+// get public payment config for frontend
+const getPaymentConfig = async (req, res) => {
+  try {
+    const { settingsCollection } = getCollections();
+    const config = await settingsCollection?.findOne({ key: 'payment_settings' });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        publishableKey: config?.publishableKey || process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
+        currency: config?.currency || 'USD',
+        mode: config?.mode || 'test',
+        escrowPercentage: config?.escrowPercentage || 10
+      }
+    });
+  } catch (error) {
+    res.status(200).json({
+      success: true,
+      data: {
+        publishableKey: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
+        currency: 'USD',
+        mode: 'test',
+        escrowPercentage: 10
+      }
+    });
+  }
 };
 
 // create stripe checkout session for rental payment
@@ -59,7 +94,7 @@ const createCheckoutSession = async (req, res) => {
     const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
 
     try {
-      const stripe = getStripe();
+      const stripe = await getStripe();
 
       // create checkout session with Stripe
       const session = await stripe.checkout.sessions.create({
@@ -108,13 +143,13 @@ const createCheckoutSession = async (req, res) => {
         diffDays
       });
     } catch (stripeError) {
-      // if stripe secret key is a placeholder or invalid in dev/test, provide fallback checkout response
-      console.warn('Stripe API Note (Using Dev Simulation):', stripeError.message);
+      // if stripe secret key is a placeholder or invalid in dev/test, redirect to the payment checkout gateway page
+      console.warn('Stripe API Note (Using Escrow Checkout Gateway):', stripeError.message);
       const mockSessionId = 'cs_test_mock_' + Date.now();
       return res.status(200).json({
         success: true,
         sessionId: mockSessionId,
-        url: `${clientUrl}/payment/success?session_id=${mockSessionId}`,
+        url: `${clientUrl}/payment/checkout?session_id=${mockSessionId}`,
         totalAmount,
         diffDays,
         isSimulated: true
@@ -151,7 +186,7 @@ const verifyCheckoutSession = async (req, res) => {
       });
     }
 
-    const stripe = getStripe();
+    const stripe = await getStripe();
     const session = await stripe.checkout.sessions.retrieve(sessionId);
 
     res.status(200).json({
@@ -171,5 +206,6 @@ const verifyCheckoutSession = async (req, res) => {
 
 module.exports = {
   createCheckoutSession,
-  verifyCheckoutSession
+  verifyCheckoutSession,
+  getPaymentConfig
 };

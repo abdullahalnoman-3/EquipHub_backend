@@ -1,124 +1,161 @@
 # 🛠️ EquipHub Backend API
 
-EquipHub is a full-featured equipment rental platform connecting equipment owners with customers. This server provides secure RESTful APIs, role-based access control, Stripe payment processing, and automated background tasks.
+> **High-Performance Equipment Rental Engine** built with **Node.js**, **Express**, **MongoDB Atlas**, **Stripe API**, **Nodemailer SMTP**, and **node-cron**.
 
 ---
 
-## 🚀 Key Features
+## 🌐 Live Services & URLs
 
-* **Authentication & Authorization**: Secure email/password authentication with bcrypt hashing, Google social login, and JWT-based session management.
-* **Role-Based Access Control (RBAC)**: Custom middlewares protecting API routes for **Customer**, **Owner**, and **Admin**.
-* **Equipment Management**: Owners can list, update, and manage equipment; Admins approve/reject listings; Customers browse and view details.
-* **Dynamic Search & Filtering (Challenge 1)**: Server-side search by name/location, category filters, price range, availability, and sorting.
-* **Favorites System**: Customers can save and manage favorite equipment with populated data.
-* **Stripe Checkout (Payment Gateway)**: Dynamic rental duration and price calculation with secure checkout session generation.
-* **Rental Bookings & Inventory**: Automated stock deduction upon booking and transaction recording in payments collection.
-* **Dashboard Analytics (Challenge 3)**: High-performance MongoDB aggregation pipelines providing real-time metrics and monthly chart datasets for Admins and Owners.
-* **Automated Cron Jobs**: Scheduled `node-cron` job running daily to automatically mark expired rentals as `Completed`.
-* **Centralized Error Handling**: Structured 404 and global 500 error handling middlewares.
+- **API Base URL:** `http://equiphubadmin.hmnoman.com/api/v1` (Local: `http://localhost:5000/api/v1`)
+- **Frontend Client:** `http://localhost:3000`
+- **GitHub Backend Repository:** [https://github.com/abdullahalnoman-3/EquipHub_backend.git](https://github.com/abdullahalnoman-3/EquipHub_backend.git)
+- **GitHub Frontend Repository:** [https://github.com/abdullahalnoman-3/EquipHub_frontend.git](https://github.com/abdullahalnoman-3/EquipHub_frontend.git)
 
 ---
 
-## 📦 NPM Packages Used
+## 🚀 Architectural & Feature Highlights
 
-* `express`: Fast, unopinionated web framework for Node.js
-* `mongodb`: Official MongoDB driver for database persistence
-* `jsonwebtoken`: Secure JWT token creation and verification
-* `bcryptjs`: Password hashing and security
-* `cors`: Cross-Origin Resource Sharing handling
-* `dotenv`: Environment variable management
-* `cookie-parser`: Parsing HTTP cookies
-* `stripe`: Stripe API SDK for processing rental payments
-* `node-cron`: Task scheduler for automated background jobs
-* `nodemon`: Development tool for automatic server reloads
+### 1. Dual-Gate Rental Lifecycle & Strict Transitions
+* **`Pending`**: Default status when a customer pays and creates a reservation. Awaits owner review.
+* **`Approved`**: Owner accepts the reservation. At this stage, either party can still cancel if needed.
+* **`Active`**: Equipment has been handed over / lease has started. **Strict Business Rule:** Active rentals cannot be cancelled or rejected—they must be marked as `Completed` upon return.
+* **`Completed`**: Rental period concluded and equipment returned in good standing.
+* **`Rejected` / `Cancelled`**: Automatically triggers inventory restoration and transfers payment to the **Refund Processing** pipeline.
+
+### 2. Automated Refund Pipeline
+* When a customer or owner cancels a `Pending` or `Approved` reservation:
+  * The order status becomes `Cancelled`.
+  * The payment status transitions to `Refund Processing`.
+  * Dedicated `refundDetails` audit object is created in the database.
+  * Payment records in `paymentsCollection` are synchronized.
+  * Reserved equipment inventory stock (`availableQuantity`) is instantly returned to the catalog.
+  * An automated email notification is dispatched to the customer informing them of the refund initiation (estimated 3–5 business days).
+
+### 3. Equipment Deletion Integrity Guard
+* To safeguard financial auditing and user transaction history, an equipment listing **cannot be deleted** if any active or historical rental orders exist for it.
+* Users must first resolve or delete the associated rental orders before the machinery listing can be removed.
+* Added `DELETE /api/v1/bookings/:id` allowing Owners and Admins to safely manage and delete resolved orders.
+
+### 4. Admin Payment Gateway Settings (Dynamic Stripe Credentials)
+* Stripe gateway credentials (`publishableKey`, `secretKey`, `webhookSecret`, `currency`, `escrowPercentage`) can be updated dynamically from the Admin dashboard without restarting the server.
+* Built-in connection testing endpoint verifies Stripe API key validity with Stripe servers.
+
+### 5. Product-Based Dynamic Reviews & Ratings
+* Equipment rating computation is fully dynamic: average rating and total review counts are calculated in real time from approved customer reviews in `reviewsCollection`.
+* Eliminates hardcoded ratings across the platform.
+
+### 6. Booking Idempotency & Deduplication
+* Guards against accidental double charges and duplicate submissions via transaction ID deduplication and rapid-click (15-second window) throttling.
+
+### 7. Automated Daily Rental Status Synchronization
+* Scheduled `node-cron` job runs daily at midnight to audit active rentals and flag past-due bookings.
 
 ---
 
-## ⚙️ Environment Variables
+## 📡 Complete RESTful API Reference
 
-Create a `.env` file in the root directory based on `.env.example`:
+### 🔐 Authentication (`/api/v1/auth`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/auth/register` | Public | Register new customer/owner account |
+| `POST` | `/api/v1/auth/login` | Public | Authenticate with email & password |
+| `POST` | `/api/v1/auth/social-login` | Public | Google OAuth social login |
+| `POST` | `/api/v1/auth/logout` | Public | Clear session cookie |
+
+### 👤 User Management (`/api/v1/users`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/users/me` | Authenticated | Retrieve current user profile |
+| `PATCH` | `/api/v1/users/me` | Authenticated | Update profile name, phone, address, photo |
+| `GET` | `/api/v1/users` | Admin | Get all registered platform users |
+| `PATCH` | `/api/v1/users/:id/role` | Admin | Upgrade or change user role (`Customer`, `Owner`, `Admin`) |
+
+### 🚜 Equipment Management (`/api/v1/equipment`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/equipment` | Public | Search, category filter, price range, and sort |
+| `GET` | `/api/v1/equipment/:id` | Public | Single equipment details with dynamic ratings |
+| `POST` | `/api/v1/equipment` | Owner/Admin | Create new equipment listing |
+| `GET` | `/api/v1/equipment/my-equipment` | Owner/Admin | Get all equipment owned by logged-in user |
+| `PATCH` | `/api/v1/equipment/:id` | Owner/Admin | Edit rates, description, stock, condition |
+| `DELETE` | `/api/v1/equipment/:id` | Owner/Admin | Delete equipment (Blocked if orders exist) |
+
+### 🛡️ Admin Controls & Settings (`/api/v1/admin`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/admin/equipment` | Admin | List all equipment across the platform |
+| `PATCH` | `/api/v1/admin/equipment/:id/status`| Admin | Moderate listing (`Approved`, `Rejected`, `Pending`) |
+| `DELETE` | `/api/v1/admin/equipment/:id` | Admin | Delete listing (Blocked if orders exist) |
+| `GET` | `/api/v1/admin/rentals` | Admin | Master log of all platform rental orders |
+| `GET` | `/api/v1/admin/payment-settings` | Admin | Retrieve dynamic Stripe gateway parameters |
+| `PATCH` | `/api/v1/admin/payment-settings` | Admin | Save dynamic Stripe credentials & escrow rate |
+| `POST` | `/api/v1/admin/payment-settings/test`| Admin | Test Stripe API connectivity with test probe |
+| `GET` | `/api/v1/admin/smtp` | Admin | Retrieve SMTP settings |
+| `PATCH` | `/api/v1/admin/smtp` | Admin | Save outbound mail configuration |
+
+### 📋 Bookings & Rentals (`/api/v1/bookings`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/bookings` | Customer | Create booking, verify payment, deduct stock |
+| `GET` | `/api/v1/bookings/my-rentals` | Customer | Customer's rental reservations |
+| `GET` | `/api/v1/bookings/owner-rentals` | Owner/Admin | Incoming customer orders for owner's machinery |
+| `PATCH` | `/api/v1/bookings/:id/status` | Authorized | Update status (`Approved`, `Active`, `Completed`, `Cancelled`, `Rejected`) |
+| `DELETE` | `/api/v1/bookings/:id` | Owner/Admin | Delete rental order record |
+
+### 💳 Payments & Stripe Checkout (`/api/v1/payments`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/payments/config` | Public | Public Stripe publishable key & currency |
+| `POST` | `/api/v1/payments/create-checkout-session` | Authenticated | Generate Stripe checkout session |
+| `GET` | `/api/v1/payments/verify-session/:sessionId` | Authenticated | Verify transaction and metadata |
+
+### ⭐ Reviews & Ratings (`/api/v1/reviews`)
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/v1/reviews/equipment/:id` | Public | Get approved reviews for an equipment |
+| `POST` | `/api/v1/reviews` | Customer | Submit verified rental review |
+| `GET` | `/api/v1/reviews/admin` | Admin | Review moderation queue |
+| `PATCH` | `/api/v1/reviews/:id/status` | Admin | Approve, reject, or hide review |
+
+---
+
+## ⚙️ Environment Configuration
+
+Create a `.env` file in the root directory:
 
 ```env
 PORT=5000
 NODE_ENV=development
-DB_USER=your_db_username
-DB_PASS=your_db_password
+DB_USER=your_mongo_username
+DB_PASS=your_mongo_password
 DB_NAME=equiphub_db
-DB_URI=mongodb+srv://<username>:<password>@cluster0.2ssk8l9.mongodb.net/equiphub_db?retryWrites=true&w=majority
-JWT_SECRET=your_jwt_secret_key
+DB_URI=mongodb+srv://<username>:<password>@cluster0.mongodb.net/equiphub_db?retryWrites=true&w=majority
+JWT_SECRET=your_jwt_secret_key_here
 CLIENT_URL=http://localhost:3000
-STRIPE_SECRET_KEY=your_stripe_secret_key
+
+# Stripe Default Fallback Keys (Can also be managed from Admin Dashboard)
+STRIPE_SECRET_KEY=sk_test_placeholder
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_placeholder
+
+# SMTP Mail Server (Can also be managed from Admin Dashboard)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
+SMTP_FROM=support@equiphub.com
 ```
 
 ---
 
-## 📡 API Endpoints Overview
+## 🚀 Running Locally
 
-### 🔐 Authentication (`/api/v1/auth`)
-* `POST /api/v1/auth/register` - Register a new customer account
-* `POST /api/v1/auth/login` - Login with email & password
-* `POST /api/v1/auth/social-login` - Google social login integration
-* `POST /api/v1/auth/logout` - Logout and clear session cookie
+```bash
+# 1. Install dependencies
+npm install
 
-### 👤 User Profile & Management (`/api/v1/users`)
-* `GET /api/v1/users/me` - Get logged-in user profile (Protected)
-* `PATCH /api/v1/users/me` - Update profile info (Protected)
-* `GET /api/v1/users` - Get all users (Admin only)
-* `PATCH /api/v1/users/:id/role` - Update user role (Admin only)
+# 2. Run with automatic reload
+npm run dev
 
-### 🚜 Equipment Management (`/api/v1/equipment`)
-* `GET /api/v1/equipment` - Public search, filter, and paginated equipment
-* `GET /api/v1/equipment/:id` - Get single equipment details
-* `POST /api/v1/equipment` - Add new equipment (Owner only)
-* `GET /api/v1/equipment/my-equipment` - Get owner's equipment (Owner only)
-* `PATCH /api/v1/equipment/:id` - Update equipment details (Owner only)
-* `DELETE /api/v1/equipment/:id` - Delete equipment (Owner only)
-
-### 🛡️ Admin Moderation (`/api/v1/admin`)
-* `GET /api/v1/admin/equipment` - View all equipment (Admin only)
-* `PATCH /api/v1/admin/equipment/:id/status` - Approve or reject equipment (Admin only)
-* `DELETE /api/v1/admin/equipment/:id` - Remove equipment (Admin only)
-* `GET /api/v1/admin/rentals` - View all platform rental orders (Admin only)
-
-### ❤️ Favorites (`/api/v1/favorites`)
-* `POST /api/v1/favorites` - Add item to customer favorites (Customer only)
-* `GET /api/v1/favorites` - Get all customer favorites with populated details (Customer only)
-* `GET /api/v1/favorites/check/:equipmentId` - Check favorite status (Customer only)
-* `DELETE /api/v1/favorites/:equipmentId` - Remove from favorites (Customer only)
-
-### 💳 Payments (`/api/v1/payments`)
-* `POST /api/v1/payments/create-checkout-session` - Create Stripe checkout session
-* `GET /api/v1/payments/verify-session/:sessionId` - Verify Stripe payment session
-
-### 📋 Bookings & Rentals (`/api/v1/bookings`)
-* `POST /api/v1/bookings` - Confirm booking after payment & deduct inventory
-* `GET /api/v1/bookings/my-rentals` - Customer rental history (Customer only)
-* `GET /api/v1/bookings/owner-rentals` - Owner equipment rental orders (Owner only)
-* `PATCH /api/v1/bookings/:id/status` - Update rental status (Owner/Admin)
-
-### 📊 Dashboard Analytics (`/api/v1/analytics`)
-* `GET /api/v1/analytics/admin` - Overall platform metrics and monthly stats (Admin only)
-* `GET /api/v1/analytics/owner` - Owner specific earnings and performance (Owner only)
-
----
-
-## 🏃‍♂️ How to Run Locally
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/abdullahalnoman-3/EquipHub_backend.git
-   cd EquipHub_backend
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
-
-3. **Configure environment:**
-   Create `.env` file and add your credentials.
-
-4. **Start the server:**
-   ```bash
-   npm run dev
-   ```
+# 3. Run production
+npm start
+```
