@@ -159,10 +159,10 @@ const loginUser = async (req, res) => {
   }
 };
 
-// google social login
+// social login (Google & GitHub)
 const socialLogin = async (req, res) => {
   try {
-    const { name, email, photoURL } = req.body;
+    const { name, email, photoURL, provider } = req.body;
 
     if (!email) {
       return res.status(400).json({
@@ -179,10 +179,11 @@ const socialLogin = async (req, res) => {
     // if user does not exist, create new user with default role Customer
     if (!user) {
       const newUser = createUserObject({
-        name: name || 'User',
+        name: name || (provider === 'GitHub' ? 'GitHub Developer' : 'User'),
         email: formattedEmail,
         photoURL: photoURL || '',
-        role: 'Customer'
+        role: 'Customer',
+        authProvider: provider || 'Google'
       });
 
       const result = await usersCollection.insertOne(newUser);
