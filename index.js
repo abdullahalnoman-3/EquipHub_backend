@@ -71,6 +71,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
+// serve public static assets (index status page, favicon, robots.txt for cPanel)
+app.use(express.static(path.join(__dirname, 'public')));
+
 // serve uploaded project files statically with security headers (nosniff & no directory listing)
 app.use(
   '/uploads',
@@ -98,11 +101,15 @@ app.use('/api/v1/bookings', bookingRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/reviews', reviewRoutes);
 
-// root route
+// root route fallback if not handled by public/index.html
 app.get('/', (req, res) => {
-  res.send({
-    success: true,
-    message: 'EquipHub server is running smoothly'
+  res.sendFile(path.join(__dirname, 'public', 'index.html'), (err) => {
+    if (err) {
+      res.send({
+        success: true,
+        message: 'EquipHub server is running smoothly'
+      });
+    }
   });
 });
 
