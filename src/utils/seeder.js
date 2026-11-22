@@ -443,14 +443,150 @@ const seedData = async () => {
         status: 'Approved',
         isActive: true,
         createdAt: new Date(Date.now() - 7 * 86400000)
+      },
+      {
+        equipmentName: 'Canon EOS R5 C 8K Cinema Camera',
+        customerName: 'Sadia Rahman',
+        customerEmail: 'sadia.rahman@gmail.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400',
+        rating: 5,
+        comment: 'Unbelievable 8K RAW video clarity and the active cooling fan was a lifesaver during our full-day outdoor shoot in Banani. Complete cinema beast!',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 3 * 86400000)
+      },
+      {
+        equipmentName: 'Canon EOS R5 C 8K Cinema Camera',
+        customerName: 'Tanvir Ahmed',
+        customerEmail: 'tanvir.event@gmail.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
+        rating: 5,
+        comment: 'Superb hybrid camera. Auto-focus is lightning fast and switching between photo and cinema OS is seamless. Everything came safely packed.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 1 * 86400000)
+      },
+      {
+        equipmentName: 'DJI Inspire 3 8K Cinema Drone',
+        customerName: 'Farhana Kabir',
+        customerEmail: 'farhana.photography@gmail.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400',
+        rating: 5,
+        comment: 'The full-frame 8K ProRes footage is cinema grade. RTK positioning provided rock-solid stability even in windy rooftop conditions.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 2 * 86400000)
+      },
+      {
+        equipmentName: 'DJI Inspire 3 8K Cinema Drone',
+        customerName: 'Kamal Hossain',
+        customerEmail: 'kamal.constructions@yahoo.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400',
+        rating: 5,
+        comment: 'Top tier aerial platform. Dual control mode worked flawlessly for our commercial shoot in Gulshan.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 4 * 86400000)
+      },
+      {
+        equipmentName: 'John Deere 5075E 4WD Utility Tractor',
+        customerName: 'Rafiqul Islam',
+        customerEmail: 'rafiqul.agri@gmail.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+        rating: 5,
+        comment: 'Heavy duty performance with excellent diesel efficiency. Handled 10 acres of field plowing effortlessly.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 5 * 86400000)
+      },
+      {
+        equipmentName: 'Concrete Mixer Truck 500L',
+        customerName: 'Belal Uddin',
+        customerEmail: 'belal.builders@gmail.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
+        rating: 5,
+        comment: 'Solid drum mixer, easy hydraulic tilt and very reliable engine. Delivered on time.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 6 * 86400000)
+      },
+      {
+        equipmentName: 'Heavy Duty Rotary Power Tiller',
+        customerName: 'Mokbul Hossain',
+        customerEmail: 'mokbul.farms@yahoo.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400',
+        rating: 4,
+        comment: 'Powerful rotary blades, cultivated the soil to fine depth. Good fuel economy and easy operation.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 4 * 86400000)
+      },
+      {
+        equipmentName: 'Isuzu NPR 4-Ton Cargo Box Truck',
+        customerName: 'Asaduzzaman',
+        customerEmail: 'asad.logistics@gmail.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+        rating: 5,
+        comment: 'Clean cargo bed and hydraulic lift worked smoothly. Great for moving heavy event equipment across Dhaka.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 3 * 86400000)
+      },
+      {
+        equipmentName: 'Honda EU3000i Super Quiet Inverter Generator',
+        customerName: 'Shamim Reza',
+        customerEmail: 'shamim.sound@gmail.com',
+        customerPhoto: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400',
+        rating: 5,
+        comment: 'Extremely quiet as advertised. Provided clean, steady power for our audio recording consoles without a glitch.',
+        status: 'Approved',
+        isActive: true,
+        createdAt: new Date(Date.now() - 2 * 86400000)
       }
     ];
 
     for (const r of reviewsToSeed) {
+      if (!r.equipmentId) {
+        const matchingEquip = await equipmentCollection.findOne({ name: r.equipmentName });
+        if (matchingEquip) {
+          r.equipmentId = matchingEquip._id;
+          r.equipmentImage = matchingEquip.image || (matchingEquip.images && matchingEquip.images[0]) || '';
+          r.customerId = customerUser._id;
+        }
+      }
       await reviewsCollection.updateOne(
         { customerName: r.customerName, equipmentName: r.equipmentName },
         { $set: r },
         { upsert: true }
+      );
+    }
+
+    // Synchronize review counts and average ratings across all equipment
+    const allSeededEquips = await equipmentCollection.find({}).toArray();
+    for (const eq of allSeededEquips) {
+      const stats = await reviewsCollection.aggregate([
+        {
+          $match: {
+            equipmentId: eq._id,
+            status: 'Approved',
+            isActive: true
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            avgRating: { $avg: '$rating' },
+            totalReviews: { $sum: 1 }
+          }
+        }
+      ]).toArray();
+
+      const avg = stats[0] ? Math.round(stats[0].avgRating * 10) / 10 : 0;
+      const count = stats[0] ? stats[0].totalReviews : 0;
+
+      await equipmentCollection.updateOne(
+        { _id: eq._id },
+        { $set: { averageRating: avg, rating: avg, reviewCount: count, totalReviews: count } }
       );
     }
 

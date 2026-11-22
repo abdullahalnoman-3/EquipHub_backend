@@ -102,10 +102,10 @@ const getAllPublicEquipment = async (req, res) => {
         const hasStats = reviewStats && reviewStats.length > 0;
         const rating = hasStats
           ? Math.round(reviewStats[0].avgRating * 10) / 10
-          : (typeof item.averageRating === 'number' ? item.averageRating : 0);
+          : 0;
         const total = hasStats
           ? reviewStats[0].totalReviews
-          : (typeof item.reviewCount === 'number' ? item.reviewCount : 0);
+          : 0;
 
         return {
           ...item,
@@ -178,10 +178,10 @@ const getEquipmentById = async (req, res) => {
     const hasStats = reviewStats && reviewStats.length > 0;
     const realRating = hasStats
       ? Math.round(reviewStats[0].avgRating * 10) / 10
-      : (typeof equipment.averageRating === 'number' ? equipment.averageRating : 0);
+      : 0;
     const realTotal = hasStats
       ? reviewStats[0].totalReviews
-      : (typeof equipment.reviewCount === 'number' ? equipment.reviewCount : 0);
+      : 0;
 
     const enrichedEquipment = {
       ...equipment,
